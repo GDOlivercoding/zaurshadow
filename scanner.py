@@ -1,0 +1,168 @@
+import re
+import output
+from zsdtoken import Token
+import tokentype as tt
+
+def intable(s: str):
+    try:
+        int(s)
+    except ValueError:
+        return False
+    return True
+
+keywords: dict[str, str] = {
+    kw: getattr(tt, kw.upper())
+    for kw in [
+        "and", "class", "else", "false", "true", 
+        "nil", "for", "declare", "if", "while",
+        "for", "print", "return", "super", "this", "var"
+    ]
+}
+
+re_varname_valid = re.compile(r"[a-zA-Z\d_]")
+
+# I simply and unfortunately do not know how this works
+class Scanner:
+    def __init__(self, source: str) -> None:
+        self.source = source
+        self.tokens: list[Token] = []
+        self.start = 0
+        self.current = 0
+        self.line = 1
+
+    def scan_tokens(self):
+        while not self.is_at_end():
+            self.start = self.current
+            #print(f"scan_tokens(): {self.start=} {self.current=} {self.tokens=}")
+            self.scan_token()
+
+        self.tokens.append(Token(tt.EOF, "", None, self.line))
+        return self.tokens
+
+    def scan_token(self):
+        char = self.advance()
+        add_token = self.add_token
+
+        match char:
+            case ")": add_token(tt.RIGHT_PAREN)
+            case "(": add_token(tt.LEFT_PAREN)
+            case "{": add_token(tt.LEFT_BRACE)
+            case "}": add_token(tt.RIGHT_BRACE)
+            case ",": add_token(tt.COMMA)
+            case ".": add_token(tt.DOT) if not intable(self.peek()) else self.parse_float()
+            case "-": add_token(tt.MINUS)
+            case "+": add_token(tt.PLUS)
+            case ";": add_token(tt.SEMICOLON)
+            case "*": add_token(tt.STAR)
+
+            case "!":
+                add_token(tt.BANG_EQUAL if self.match("=") else tt.BANG)
+            case ">":
+                add_token(tt.GREATER_EQUAL if self.match("=") else tt.GREATER)
+            case "<":
+                add_token(tt.LESS_EQUAL if self.match("=") else tt.LESS)
+            case "=":
+                add_token(tt.EQUAL_EQUAL if self.match("=") else tt.EQUAL)
+
+            case "/":
+                if self.match("/"):
+                    while self.peek() != "\n" and not self.is_at_end(): 
+                        self.advance()
+
+                elif self.match("*"):
+                    line = self.line
+                    while True:
+                        if self.is_at_end():
+                            output.errorline(line, "Unterminated multiline comment")
+                            break
+
+                        if self.peek() == "*" and self.peek_next() == "/":
+                            # consume the trailing boundaries (*/)
+                            self.advance()
+                            self.advance()
+                            break
+
+                        if self.peek() == "\n":
+                            self.line += 1
+
+                        self.advance()
+
+                else:
+                    add_token(tt.SLASH)
+
+            case " " | "\r" | "\t": pass
+            case "\n": self.line += 1
+
+            case '"': self.parse_string()
+        
+            case _: 
+                if intable(char):
+                    self.parse_float()
+                elif char.isalpha():
+                    self.parse_identifier()
+                else:
+                    output.errorline(self.line, "Unexpected character.")
+
+    def parse_string(self):
+        while (
+            self.peek() != '"' 
+            #and self.source[self.current-1] != "\\" 
+            and not self.is_at_end()
+        ):
+            if self.peek() == "\n":
+                output.errorline(self.line, "Unterminated string at newline.")
+
+            self.advance()
+
+        if self.is_at_end():
+            output.errorline(self.line, "Unterminated string at EOF.")
+
+        self.advance()
+
+        value = self.source[self.start+1:self.current-1]
+        #print(value)
+        self.add_token(tt.STRING, value)
+
+    def parse_float(self):
+        while intable(self.peek()): self.advance()
+
+        if self.peek() == "." and intable(self.peek_next()):
+            self.advance()
+            while intable(self.peek()): self.advance()
+
+        #print(f"parse_float(): {self.start=} {self.current=}")
+        self.add_token(tt.NUMBER, float(self.source[self.start:self.current]))
+
+    def parse_identifier(self):
+        while re_varname_valid.match(self.peek()): self.advance()
+
+        text = self.source[self.start:self.current]
+        type = keywords.get(text, None) or tt.IDENTIFIER
+        self.add_token(type)
+
+    def match(self, expected_char: str):
+        if self.is_at_end(): return False
+        if (self.source[self.current] != expected_char): return False
+
+        self.current += 1
+        return True
+
+    def peek(self):
+        if self.is_at_end(): return "\0"
+        return self.source[self.current]
+    
+    def peek_next(self):
+        if self.is_at_end(): return "\0"
+        return self.source[self.current+1]
+
+    def advance(self):
+        result = self.source[self.current]
+        self.current += 1
+        return result
+    
+    def add_token(self, type: tt.TokenType, literal: object = None):
+        lexeme = self.source[self.start:self.current]
+        self.tokens.append(Token(type, lexeme, literal, self.line))
+    
+    def is_at_end(self):
+        return self.current >= len(self.source)

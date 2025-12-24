@@ -1,0 +1,13 @@
+var number = .5;
+
+/* meow 
+*/
+
+var a = func(); // comment
+a.b = 8;
+
+var inst = String(a.b);
+print inst;
+
+var hello = "i like strawberries";
+print hello;

@@ -1,0 +1,7 @@
+expr → 
+    | (expr ( 
+        | "(" ( expr ( "," expr )* )? ")" 
+        | "." IDENTIFIER 
+    )+)
+    | IDENTIFIER
+    | NUMBER

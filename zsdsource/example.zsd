@@ -1,0 +1,54 @@
+var hello = "Hello world";
+var integer = 1;
+var float = 4.7 + (5 * 40);
+var boolean = true and false;
+var nothing = nil;
+
+// comment 
+/*
+multi
+line
+comment
+*/
+
+if cond {
+    block
+};
+
+declare main {
+    block
+};
+
+declare eval(param) {
+    block
+};
+
+while cond {
+
+};
+
+do {
+
+} while cond;
+
+for obj of iter {
+
+};
+
+print(hello);
+print hello;
+
+var printFunc = print;
+
+class Base < Sub {
+    constructor() {
+        super.init();
+        this.name = "meow";
+    };
+
+    method(param) {
+        return param * 8
+    };
+
+    foo = 8;
+};
