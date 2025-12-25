@@ -1,0 +1,140 @@
+from environment import Environment
+from expr import (
+    Assign,
+    Binary,
+    Grouping,
+    LiteralValue,
+    Unary,
+    Variable,
+    Visitor as ExprVisitor,
+    Expr
+)
+import stmt
+import output
+from output import ZSDRuntimeError
+import tokentype as tt
+from zsdtoken import Token
+from typing import Any
+
+# region Interpreter
+class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
+    def __init__(self) -> None:
+        self.env = Environment()
+
+    def interpret(self, statements: list[stmt.Stmt]):
+        try: 
+            for statement in statements:
+                self.execute(statement)
+        except ZSDRuntimeError as e:
+            output.runtime_error(e)
+
+    def shadowize(self, object: object):
+        if object is None: return "nil"
+        return str(object)
+
+    def evaluate(self, expr: Expr):
+        return expr.accept(self)
+    
+    def execute(self, stmt: stmt.Stmt):
+        return stmt.accept(self)
+    
+    def check_type(self, operand: object, operator: Token):
+        if isinstance(operand, (float, int)): return
+        raise ZSDRuntimeError(operator, "Operand must be a number.")
+    
+    def check_types(self, operator: Token, left: object, right: object):
+        if isinstance(left, (float | int)) and isinstance(right, (float | int)): return
+        raise ZSDRuntimeError(operator, "Operands must be numbers.")
+    
+    def execute_block(self, statements: list[stmt.Stmt], env: Environment):
+        previous = self.env
+
+        try:
+            self.env = env
+
+            for stmt in statements:
+                self.execute(stmt)
+
+        finally: 
+            self.env = previous
+
+
+    # region visits
+
+
+    def visit_block_stmt(self, stmt: stmt.Block) -> None:
+        return self.execute_block(stmt.statements, Environment(self.env))
+
+    def visit_expression_stmt(self, stmt: stmt.Expression) -> None:
+        self.evaluate(stmt.expression)
+        return
+    
+    def visit_print_stmt(self, stmt: stmt.Print) -> None:
+        value = self.evaluate(stmt.expression)
+        return print(value)
+    
+    def visit_var_stmt(self, stmt: stmt.Var) -> None:
+        value = self.evaluate(stmt.initializer)
+        self.env.define(stmt.name.lexeme, value)
+
+    def visit_variable_expr(self, expr: Variable) -> object:
+        # XXX The book passes in expr.name of type Token instead
+        return self.env.get(expr.name)
+    
+    def visit_assign_expr(self, expr: Assign) -> object:
+        value = self.evaluate(expr)
+        self.env.assign(expr.name, value)
+        return value
+
+    def visit_literalvalue_expr(self, expr: LiteralValue) -> object:
+        return expr.value
+    
+    def visit_grouping_expr(self, expr: Grouping) -> object:
+        return self.evaluate(expr.expression)
+    
+    def visit_unary_expr(self, expr: Unary) -> object:
+        right: Any = self.evaluate(expr.right)
+
+        #if not isinstance(right, (float, int)):
+        #    output.error(expr.operator, "Non number")
+
+        match expr.operator.type:
+            case tt.MINUS:
+                return -float(right)
+            case tt.PLUS:
+                return +float(right)
+            case tt.BANG:
+                return right in (False, None)
+            
+        raise ValueError
+    
+    def visit_binary_expr(self, expr: Binary) -> object:
+        left: Any = self.evaluate(expr.left)
+        right: Any = self.evaluate(expr.right)
+
+        match expr.operator.type:
+            case tt.MINUS:
+                return left - right
+            case tt.STAR:
+                return left * right
+            case tt.SLASH:
+                return left / right
+            case tt.PLUS:
+                if isinstance(left, str) and isinstance(right, str):
+                    return left + right
+                if isinstance(left, (float, int)) and isinstance(right, (float, int)):
+                    return left + right
+            case tt.GREATER:
+                return left > right
+            case tt.GREATER_EQUAL:
+                return left >= right
+            case tt.LESS:
+                return left < right
+            case tt.LESS_EQUAL:
+                return left <= right
+            case tt.EQUAL_EQUAL:
+                return left == right
+            case tt.BANG_EQUAL:
+                return left != right
+            
+        raise ZSDRuntimeError(expr.operator, "Invalid operand types.")

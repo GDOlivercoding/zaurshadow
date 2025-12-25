@@ -1,8 +1,0 @@
-<ZSDToken VAR #L1 lexeme='var'>
-<ZSDToken VAR #L1 lexeme='var'>
-<ZSDToken IDENTIFIER #L1 lexeme='varvar'>
-<ZSDToken VAR #L1 lexeme='var'>
-<ZSDToken IDENTIFIER #L1 lexeme='varvar'>
-<ZSDToken VAR #L1 lexeme='var'>
-<ZSDToken VAR #L1 lexeme='var'>
-<ZSDToken EOF #L1>

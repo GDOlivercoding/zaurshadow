@@ -1,20 +1,57 @@
-from expr import Binary, Unary, LiteralValue, Expr, Grouping
+from expr import (
+    Assign,
+    Binary,
+    Expr,
+    Grouping,
+    LiteralValue,
+    Unary,
+    Variable
+)
+from output import ParseError
+from stmt import Stmt
 from zsdtoken import Token
-import tokentype as tt
-import output
 
-class ParseError(ValueError): pass
+import output
+import stmt
+import tokentype as tt
 
 class Parser:
     def __init__(self, tokens: list[Token]) -> None:
         self.tokens = tokens
         self.current = 0
 
-    def parse(self):
+    def parse(self) -> list[Stmt]:
+        statements: list[Stmt] = []
+        while not self.is_at_end():
+            # XXX In the book, even if self.declaration() returns
+            # None, it gets added to the list
+            statement = self.declaration()
+            if statement: statements.append(statement)
+
+        return statements
+    
+    def declaration(self):
         try:
-            return self.expression()
+            if self.match(tt.VAR): return self.var_declaration()
+            return self.statement()
         except ParseError:
-            return None
+            self.synchronize()
+            return 
+        
+    def var_declaration(self):
+        name = self.consume(tt.IDENTIFIER, "Expect variable name.")
+
+        if self.match(tt.EQUAL):
+            init = self.expression()
+        else: 
+            init = LiteralValue(None)
+
+        self.consume(tt.SEMICOLON, "Expect ';' after variable declaration.")
+        return stmt.Var(name, init)
+
+    # https://craftinginterpreters.com/statements-and-state.html#assignment-syntax
+    def expression(self):
+        return self.assignment()
 
     def equality(self):
         expr: Expr = self.comparison()
@@ -24,9 +61,52 @@ class Parser:
             right = self.comparison()
             expr = Binary(expr, operator, right)
 
+        if self.match(tt.LEFT_PAREN):
+            raise self.error(self.previous(), "Unexpected symbol.")
+
         return expr
 
-    expression = equality
+    def statement(self):
+        if self.match(tt.PRINT):
+            return self.print_statement()
+        if self.match(tt.LEFT_BRACE):
+            return stmt.Block(self.block())
+        
+        return self.expr_statement()
+    
+    def block(self):
+        statements: list[Stmt] = []
+        while not self.check(tt.RIGHT_BRACE) and not self.is_at_end():
+            obj = self.declaration()
+            if obj: statements.append(obj)
+    
+        self.consume(tt.RIGHT_BRACE, "Expect '}' after block.")
+        return statements
+
+    def print_statement(self):
+        value = self.expression()
+        self.consume(tt.SEMICOLON, "Expect ';' after value.")
+        return stmt.Print(value)
+    
+    def expr_statement(self):
+        expr = self.expression()
+        self.consume(tt.SEMICOLON, "Expect ';' after expression.")
+        return stmt.Expression(expr)
+    
+    def assignment(self):
+        expr = self.equality()
+
+        if self.match(tt.EQUAL):
+            equals = self.previous()
+            value = self.assignment()
+
+            if isinstance(expr, Variable):
+                name = expr.name
+                return Assign(name, value)
+            
+            raise self.error(equals, "Invalid assignment target.")
+        
+        return expr
 
     def comparison(self):
         expr = self.term()
@@ -66,8 +146,8 @@ class Parser:
         
         return self.primary()
     
-    # the return hint clears up 'Unknown' being in the return type for some reason
-    def primary(self) -> LiteralValue | Grouping:
+    # the return hint clears up 'Unknown' from being in the return type for some reason
+    def primary(self) -> Expr:
         if self.match(tt.TRUE):  return LiteralValue(True)  
         if self.match(tt.FALSE): return LiteralValue(False)
         if self.match(tt.NIL):   return LiteralValue(None)
@@ -79,6 +159,9 @@ class Parser:
             expr = self.expression()
             self.consume(tt.RIGHT_PAREN, "Expected ')' after expression.")
             return Grouping(expr)
+        
+        if self.match(tt.IDENTIFIER):
+            return Variable(self.previous())
         
         raise self.error(self.peek(), "Expected expression.")
 
