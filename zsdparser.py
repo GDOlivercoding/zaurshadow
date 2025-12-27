@@ -4,6 +4,7 @@ from expr import (
     Expr,
     Grouping,
     LiteralValue,
+    Logical,
     Unary,
     Variable
 )
@@ -49,7 +50,6 @@ class Parser:
         self.consume(tt.SEMICOLON, "Expect ';' after variable declaration.")
         return stmt.Var(name, init)
 
-    # https://craftinginterpreters.com/statements-and-state.html#assignment-syntax
     def expression(self):
         return self.assignment()
 
@@ -67,6 +67,8 @@ class Parser:
         return expr
 
     def statement(self):
+        if self.match(tt.IF):  
+            return self.if_statement()
         if self.match(tt.PRINT):
             return self.print_statement()
         if self.match(tt.LEFT_BRACE):
@@ -74,6 +76,31 @@ class Parser:
         
         return self.expr_statement()
     
+    def if_statement(self):
+        conditions: list[tuple[Expr, Stmt]] = []
+
+        self.consume(tt.LEFT_PAREN, "Expect '(' after 'if'.")
+        condition = self.expression()
+        self.consume(tt.RIGHT_PAREN, "Expect ')' after if condition.")
+
+        then_branch = self.statement()
+        conditions.append((condition, then_branch))
+
+        while self.match(tt.ELSEIF) and not self.is_at_end():
+            self.consume(tt.LEFT_PAREN, "Expect '(' after 'elseif'.")
+            condition = self.expression()
+            self.consume(tt.RIGHT_PAREN, "Expect ')' after elseif condition.")
+
+            then_branch = self.statement()
+            conditions.append((condition, then_branch))
+
+        if self.match(tt.ELSE):
+            else_branch = self.statement()
+        else: 
+            else_branch = None
+
+        return stmt.If(conditions, else_branch)
+
     def block(self):
         statements: list[Stmt] = []
         while not self.check(tt.RIGHT_BRACE) and not self.is_at_end():
@@ -94,7 +121,7 @@ class Parser:
         return stmt.Expression(expr)
     
     def assignment(self):
-        expr = self.equality()
+        expr = self.logical_or()
 
         if self.match(tt.EQUAL):
             equals = self.previous()
@@ -106,6 +133,26 @@ class Parser:
             
             raise self.error(equals, "Invalid assignment target.")
         
+        return expr
+    
+    def logical_or(self):
+        expr = self.logical_and()
+
+        while self.match(tt.OR):
+            operator = self.previous()  
+            right = self.logical_and()
+            expr = Logical(expr, operator, right)
+
+        return expr
+    
+    def logical_and(self):
+        expr = self.equality()
+
+        while self.match(tt.AND):
+            operator = self.previous()
+            right = self.equality()
+            expr = Logical(expr, operator, right)
+
         return expr
 
     def comparison(self):

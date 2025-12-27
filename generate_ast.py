@@ -11,6 +11,7 @@ def main():
         "Assign": [("name", "Token"), ("value", "Expr")],
         "Binary": [("left", "Expr"), ("operator", "Token"), ("right", "Expr")],
         "Grouping": [("expression", "Expr")],
+        "Logical": [("left", "Expr"), ("operator", "Token"), ("right", "Expr")],
         "LiteralValue": [("value", "object")],
         "Unary": [("operator", "Token"), ("right", "Expr")],
         "Variable": [("name", "Token")]
@@ -18,6 +19,7 @@ def main():
 
     define_ast(output_dir, "Stmt", {
         "Expression": [("expression", "Expr")],
+        "If": [("conditions", "list[tuple[Expr, Stmt]]"), ("else_branch", "Stmt | None = None")],
         "Block": [("statements", "list[Stmt]")],
         "Print": [("expression", "Expr")],
         "Var": [("name", "Token"), ("initializer", "Expr")]

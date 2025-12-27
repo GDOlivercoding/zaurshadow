@@ -7,6 +7,7 @@ class Visitor[T](Protocol):
     def visit_assign_expr(self, expr: Assign) -> T: ...
     def visit_binary_expr(self, expr: Binary) -> T: ...
     def visit_grouping_expr(self, expr: Grouping) -> T: ...
+    def visit_logical_expr(self, expr: Logical) -> T: ...
     def visit_literalvalue_expr(self, expr: LiteralValue) -> T: ...
     def visit_unary_expr(self, expr: Unary) -> T: ...
     def visit_variable_expr(self, expr: Variable) -> T: ...
@@ -41,6 +42,16 @@ class Grouping(Expr):
 
     def accept[T](self, visitor: Visitor[T]) -> T:
         return visitor.visit_grouping_expr(self)
+
+
+class Logical(Expr):
+    def __init__(self, left: Expr, operator: Token, right: Expr):
+        self.left = left
+        self.operator = operator
+        self.right = right
+
+    def accept[T](self, visitor: Visitor[T]) -> T:
+        return visitor.visit_logical_expr(self)
 
 
 class LiteralValue(Expr):

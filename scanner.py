@@ -1,5 +1,5 @@
 import re
-import output
+from zaurshadow import output
 from zsdtoken import Token
 import tokentype as tt
 
@@ -14,7 +14,7 @@ keywords: dict[str, str] = {
     kw: getattr(tt, kw.upper())
     for kw in [
         "and", "class", "else", "false", "true", 
-        "nil", "for", "declare", "if", "while",
+        "nil", "for", "declare", "if", "elseif", "while",
         "for", "print", "return", "super", "this", "var"
     ]
 }
@@ -98,7 +98,7 @@ class Scanner:
             case _: 
                 if intable(char):
                     self.parse_float()
-                elif char.isalpha():
+                elif re_varname_valid.match(char):
                     self.parse_identifier()
                 else:
                     output.errorline(self.line, "Unexpected character.")

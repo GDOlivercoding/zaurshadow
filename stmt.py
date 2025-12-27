@@ -6,6 +6,7 @@ from zsdtoken import Token
 
 class Visitor[T](Protocol):
     def visit_expression_stmt(self, stmt: Expression) -> T: ...
+    def visit_if_stmt(self, stmt: If) -> T: ...
     def visit_block_stmt(self, stmt: Block) -> T: ...
     def visit_print_stmt(self, stmt: Print) -> T: ...
     def visit_var_stmt(self, stmt: Var) -> T: ...
@@ -21,6 +22,15 @@ class Expression(Stmt):
 
     def accept[T](self, visitor: Visitor[T]) -> T:
         return visitor.visit_expression_stmt(self)
+
+
+class If(Stmt):
+    def __init__(self, conditions: list[tuple[Expr, Stmt]], else_branch: Stmt | None = None):
+        self.conditions = conditions
+        self.else_branch = else_branch
+
+    def accept[T](self, visitor: Visitor[T]) -> T:
+        return visitor.visit_if_stmt(self)
 
 
 class Block(Stmt):

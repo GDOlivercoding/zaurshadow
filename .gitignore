@@ -1,3 +1,5 @@
 __pycache__
 *.png
 *.txt
+*.env
+dc_main.py

@@ -1,9 +1,11 @@
+from collections.abc import Sequence
 from environment import Environment
 from expr import (
     Assign,
     Binary,
     Grouping,
     LiteralValue,
+    Logical,
     Unary,
     Variable,
     Visitor as ExprVisitor,
@@ -21,7 +23,7 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
     def __init__(self) -> None:
         self.env = Environment()
 
-    def interpret(self, statements: list[stmt.Stmt]):
+    def interpret(self, statements: Sequence[stmt.Stmt]):
         try: 
             for statement in statements:
                 self.execute(statement)
@@ -48,16 +50,16 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
     
     def execute_block(self, statements: list[stmt.Stmt], env: Environment):
         previous = self.env
-
         try:
             self.env = env
-
             for stmt in statements:
                 self.execute(stmt)
-
         finally: 
             self.env = previous
 
+    def is_truthy(self, value: object):
+        # Ruby's implementation
+        return value not in (False, None)
 
     # region visits
 
@@ -69,25 +71,35 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         self.evaluate(stmt.expression)
         return
     
+    def visit_if_stmt(self, stmt: stmt.If) -> None:
+        conditions = stmt.conditions
+        while conditions:
+            condition, body = conditions.pop(0)
+            if self.is_truthy(self.evaluate(condition)):
+                self.execute(body)
+                break
+        else:
+            if stmt.else_branch:
+                self.execute(stmt.else_branch)
+    
     def visit_print_stmt(self, stmt: stmt.Print) -> None:
         value = self.evaluate(stmt.expression)
         return print(value)
     
     def visit_var_stmt(self, stmt: stmt.Var) -> None:
         value = self.evaluate(stmt.initializer)
-        self.env.define(stmt.name.lexeme, value)
+        self.env.define(stmt.name, value)
 
     def visit_variable_expr(self, expr: Variable) -> object:
-        # XXX The book passes in expr.name of type Token instead
         return self.env.get(expr.name)
     
     def visit_assign_expr(self, expr: Assign) -> object:
-        value = self.evaluate(expr)
+        value = self.evaluate(expr.value)
         self.env.assign(expr.name, value)
         return value
 
     def visit_literalvalue_expr(self, expr: LiteralValue) -> object:
-        return expr.value
+        return expr.value if expr.value is not None else "nil"
     
     def visit_grouping_expr(self, expr: Grouping) -> object:
         return self.evaluate(expr.expression)
@@ -104,7 +116,7 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
             case tt.PLUS:
                 return +float(right)
             case tt.BANG:
-                return right in (False, None)
+                return self.is_truthy(right)
             
         raise ValueError
     
@@ -138,3 +150,20 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
                 return left != right
             
         raise ZSDRuntimeError(expr.operator, "Invalid operand types.")
+
+    def visit_logical_expr(self, expr: Logical) -> object:
+        left = self.evaluate(expr.left)
+
+        match expr.operator.type:
+            case tt.OR:
+                if self.is_truthy(left): 
+                    return left
+                
+            case tt.AND:
+                if not self.is_truthy(left): 
+                    return left
+                
+            case _:
+                raise ValueError(f"{expr.operator!r}")
+            
+        return self.evaluate(expr.right)
