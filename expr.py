@@ -25,6 +25,8 @@ class Assign(Expr):
     def accept[T](self, visitor: Visitor[T]) -> T:
         return visitor.visit_assign_expr(self)
 
+    def __repr__(self) -> str:
+        return f"<Assign name={self.name} value={self.value}"
 
 class Binary(Expr):
     def __init__(self, left: Expr, operator: Token, right: Expr):
@@ -35,6 +37,8 @@ class Binary(Expr):
     def accept[T](self, visitor: Visitor[T]) -> T:
         return visitor.visit_binary_expr(self)
 
+    def __repr__(self) -> str:
+        return f"<Binary left={self.left} operator={self.operator} right={self.right}"
 
 class Grouping(Expr):
     def __init__(self, expression: Expr):
@@ -43,6 +47,8 @@ class Grouping(Expr):
     def accept[T](self, visitor: Visitor[T]) -> T:
         return visitor.visit_grouping_expr(self)
 
+    def __repr__(self) -> str:
+        return f"<Grouping expression={self.expression}"
 
 class Logical(Expr):
     def __init__(self, left: Expr, operator: Token, right: Expr):
@@ -53,6 +59,8 @@ class Logical(Expr):
     def accept[T](self, visitor: Visitor[T]) -> T:
         return visitor.visit_logical_expr(self)
 
+    def __repr__(self) -> str:
+        return f"<Logical left={self.left} operator={self.operator} right={self.right}"
 
 class LiteralValue(Expr):
     def __init__(self, value: object):
@@ -61,6 +69,8 @@ class LiteralValue(Expr):
     def accept[T](self, visitor: Visitor[T]) -> T:
         return visitor.visit_literalvalue_expr(self)
 
+    def __repr__(self) -> str:
+        return f"<LiteralValue value={self.value}"
 
 class Unary(Expr):
     def __init__(self, operator: Token, right: Expr):
@@ -70,6 +80,8 @@ class Unary(Expr):
     def accept[T](self, visitor: Visitor[T]) -> T:
         return visitor.visit_unary_expr(self)
 
+    def __repr__(self) -> str:
+        return f"<Unary operator={self.operator} right={self.right}"
 
 class Variable(Expr):
     def __init__(self, name: Token):
@@ -78,3 +90,5 @@ class Variable(Expr):
     def accept[T](self, visitor: Visitor[T]) -> T:
         return visitor.visit_variable_expr(self)
 
+    def __repr__(self) -> str:
+        return f"<Variable name={self.name}"

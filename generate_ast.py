@@ -22,7 +22,8 @@ def main():
         "If": [("conditions", "list[tuple[Expr, Stmt]]"), ("else_branch", "Stmt | None = None")],
         "Block": [("statements", "list[Stmt]")],
         "Print": [("expression", "Expr")],
-        "Var": [("name", "Token"), ("initializer", "Expr")]
+        "Var": [("name", "Token"), ("initializer", "Expr")],
+        "While": [("condition", "Expr"), ("body", "Stmt")]
     })
 
 def define_ast(output_dir: Path, baseclass: str, types: dict[str, list[tuple[str, str]]]):
@@ -70,6 +71,9 @@ def define_type(write: Callable, basename: str, classname: str, field_list: list
     write("")
     write(f"    def accept[T](self, visitor: Visitor[T]) -> T:")
     write(f"        return visitor.visit_{classname.lower()}_{basename.lower()}(self)\n")
+
+    write( "    def __repr__(self) -> str:")
+    write(f"        return f\"<{classname} {" ".join(["%s={self.%s}" % (name, name) for name,_ in field_list])}\"")
 
 if __name__ == "__main__":
     main()
