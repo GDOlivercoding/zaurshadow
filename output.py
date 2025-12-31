@@ -1,7 +1,7 @@
 import sys
 from typing import TYPE_CHECKING
 from zsdtoken import Token
-import tokentype as tt
+from tokentype import TokenType as tt
 
 if TYPE_CHECKING:
     from _typeshed import SupportsWrite
@@ -26,7 +26,7 @@ def report(line: int, where: str, message: str):
 def runtime_error(error: ZSDRuntimeError):
     global had_runtime_error
     had_runtime_error = True
-    print(f"[Line {error.token.line}]: {error.message}", file=stream)
+    print(f"[Line {error.token.line}] at {error.token.lexeme!r}: {error.message}", file=stream)
 
 
 def errorline(line: int, message: str):

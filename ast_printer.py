@@ -7,7 +7,7 @@ from expr import (
     Unary
 )
 from zsdtoken import Token
-import tokentype as tt
+from tokentype import TokenType as tt
 
 class ASTPrinter(Visitor[str]):
     def print(self, expr: Expr):

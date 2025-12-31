@@ -6,7 +6,7 @@ from zsdparser import Parser
 import output
 from stmt import Expression, Print
 from zsdtoken import Token
-import tokentype as tt
+from tokentype import TokenType as tt
 
 interpreter = Interpreter()
 

@@ -14,7 +14,7 @@ from expr import (
 import stmt
 import output
 from output import ZSDRuntimeError
-import tokentype as tt
+from tokentype import TokenType as tt
 from zsdtoken import Token
 from typing import Any
 
@@ -81,6 +81,10 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         else:
             if stmt.else_branch:
                 self.execute(stmt.else_branch)
+
+    def visit_while_stmt(self, stmt: stmt.While) -> None:
+        while self.is_truthy(self.evaluate(stmt.condition)):
+            self.execute(stmt.body)
     
     def visit_print_stmt(self, stmt: stmt.Print) -> None:
         value = self.evaluate(stmt.expression)
@@ -91,6 +95,7 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         self.env.define(stmt.name, value)
 
     def visit_variable_expr(self, expr: Variable) -> object:
+        #print(expr.name.lexeme, "for", self.env.get(expr.name))
         return self.env.get(expr.name)
     
     def visit_assign_expr(self, expr: Assign) -> object:
@@ -99,7 +104,7 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         return value
 
     def visit_literalvalue_expr(self, expr: LiteralValue) -> object:
-        return expr.value if expr.value is not None else "nil"
+        return expr.value
     
     def visit_grouping_expr(self, expr: Grouping) -> object:
         return self.evaluate(expr.expression)
@@ -112,15 +117,16 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
 
         match expr.operator.type:
             case tt.MINUS:
-                return -float(right)
+                return -right
             case tt.PLUS:
-                return +float(right)
+                return abs(right)
             case tt.BANG:
-                return self.is_truthy(right)
+                return not self.is_truthy(right)
             
         raise ValueError
     
     def visit_binary_expr(self, expr: Binary) -> object:
+        #print("bin", expr.left, expr.right)
         left: Any = self.evaluate(expr.left)
         right: Any = self.evaluate(expr.right)
 
@@ -132,8 +138,9 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
             case tt.SLASH:
                 return left / right
             case tt.PLUS:
-                if isinstance(left, str) and isinstance(right, str):
-                    return left + right
+                #print("plus", type(left) is type(right))
+                if isinstance(left, str) or isinstance(right, str):
+                    return str(left) + str(right)
                 if isinstance(left, (float, int)) and isinstance(right, (float, int)):
                     return left + right
             case tt.GREATER:

@@ -1,7 +1,7 @@
 import re
-from zaurshadow import output
+import output
 from zsdtoken import Token
-import tokentype as tt
+from tokentype import TokenType as tt
 
 def intable(s: str):
     try:
@@ -9,15 +9,6 @@ def intable(s: str):
     except ValueError:
         return False
     return True
-
-keywords: dict[str, str] = {
-    kw: getattr(tt, kw.upper())
-    for kw in [
-        "and", "class", "else", "false", "true", 
-        "nil", "for", "declare", "if", "elseif", "while",
-        "for", "print", "return", "super", "this", "var"
-    ]
-}
 
 re_varname_valid = re.compile(r"[a-zA-Z\d_]")
 
@@ -49,7 +40,7 @@ class Scanner:
             case "{": add_token(tt.LEFT_BRACE)
             case "}": add_token(tt.RIGHT_BRACE)
             case ",": add_token(tt.COMMA)
-            case ".": add_token(tt.DOT) if not intable(self.peek()) else self.parse_float()
+            case ".": add_token(tt.DOT) if not intable(self.peek()) else self.parse_number()
             case "-": add_token(tt.MINUS)
             case "+": add_token(tt.PLUS)
             case ";": add_token(tt.SEMICOLON)
@@ -97,7 +88,7 @@ class Scanner:
         
             case _: 
                 if intable(char):
-                    self.parse_float()
+                    self.parse_number()
                 elif re_varname_valid.match(char):
                     self.parse_identifier()
                 else:
@@ -123,21 +114,36 @@ class Scanner:
         #print(value)
         self.add_token(tt.STRING, value)
 
-    def parse_float(self):
+    def parse_number(self):
         while intable(self.peek()): self.advance()
+        dot = "." in self.source[self.start:self.current]
 
-        if self.peek() == "." and intable(self.peek_next()):
-            self.advance()
-            while intable(self.peek()): self.advance()
+        if self.peek() == "." and not dot:
+            if intable(self.peek_next()):
+                dot = True
+                self.advance()
+                while intable(self.peek()): self.advance()
 
+            # implement this later
+            elif self.peek_next() == ".":
+                start = int(self.source[self.start:self.current])
+                self.advance()
+                inclusive = self.match("=")
+
+                end_line = self.current
+                while intable(self.peek()): self.advance()
+                stop = int(self.source[end_line:self.current])
+                self.add_token(tt.RANGE, range(start, stop + inclusive))
+
+        init_choice = dot and float or int
         #print(f"parse_float(): {self.start=} {self.current=}")
-        self.add_token(tt.NUMBER, float(self.source[self.start:self.current]))
+        self.add_token(tt.NUMBER, init_choice(self.source[self.start:self.current]))
 
     def parse_identifier(self):
         while re_varname_valid.match(self.peek()): self.advance()
 
         text = self.source[self.start:self.current]
-        type = keywords.get(text, None) or tt.IDENTIFIER
+        type = tt.keywords.get(text, None) or tt.IDENTIFIER
         self.add_token(type)
 
     def match(self, expected_char: str):

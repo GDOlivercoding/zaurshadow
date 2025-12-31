@@ -1,0 +1,66 @@
+// you can add comments with double slash
+
+/*
+and multiline comments with slash+star
+meow
+*/ 
+
+// literal values, output them with the print statement
+print "Hello world!";
+print 4;
+print 2.7;
+print nil;
+print true;
+print false;
+print "";
+
+// you can declare a variable once, and then change it later
+var a = 4;
+print a;
+a = 6;
+print a;
+print "";
+
+// if theres no initializer, it defaults to nil (zsd's null value)
+var b;
+print b;
+print "";
+
+// you can create scoped blocks
+{
+    var a = 5;
+    print a; // 5
+}
+print a; // 4
+print "";
+
+// you can use all of, +-/*, >=, >, ==, <, <= and logical `and` + `or`
+// you can also created groups anywhere
+print 5 + 4 * 3;
+print (5 + 4) * 3;
+print (5 * 4 == 20) and (64 / 8 == 8);
+print 1.1 > 1;
+print 1 >= 1;
+print 0 == 0;
+print "";
+
+// you can also use unary -+
+print -(5);
+print +(1 - 5);
+print "";
+
+var something = -5;
+print +something;
+print "";
+
+// control flow
+
+if something >= 0 {
+    print "positive number!";
+} elseif something >= -10 {
+    print "0 > something >= -10";
+} else {
+    print "Very negative value!";
+}
+
+// i can currently implement for and while loops as well

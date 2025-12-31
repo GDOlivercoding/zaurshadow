@@ -14,7 +14,7 @@ from zsdtoken import Token
 
 import output
 import stmt
-import tokentype as tt
+from tokentype import TokenType as tt, TokenType
 
 class Parser:
     def __init__(self, tokens: list[Token]) -> None:
@@ -50,9 +50,6 @@ class Parser:
         self.consume(tt.SEMICOLON, "Expect ';' after variable declaration.")
         return stmt.Var(name, init)
 
-    def expression(self):
-        return self.assignment()
-
     def equality(self):
         expr: Expr = self.comparison()
 
@@ -61,10 +58,9 @@ class Parser:
             right = self.comparison()
             expr = Binary(expr, operator, right)
 
-        if self.match(tt.LEFT_PAREN):
-            raise self.error(self.previous(), "Unexpected symbol.")
-
         return expr
+
+    # region statements
 
     def statement(self):
         if self.match(tt.IF):  
@@ -72,27 +68,28 @@ class Parser:
         if self.match(tt.PRINT):
             return self.print_statement()
         if self.match(tt.LEFT_BRACE):
-            return stmt.Block(self.block())
+            return self.block()
+        if self.match(tt.WHILE):
+            return self.while_statement()
+        if self.match(tt.FOR):
+            return self.for_statement()
         
         return self.expr_statement()
     
     def if_statement(self):
         conditions: list[tuple[Expr, Stmt]] = []
 
-        self.consume(tt.LEFT_PAREN, "Expect '(' after 'if'.")
-        condition = self.expression()
-        self.consume(tt.RIGHT_PAREN, "Expect ')' after if condition.")
+        def consume_condition(name: str):
+            condition = self.expression()
+            self.consume(tt.LEFT_BRACE, "Expect '{' after %s condition." % name)
 
-        then_branch = self.statement()
-        conditions.append((condition, then_branch))
+            then_branch = self.block()
+            conditions.append((condition, then_branch))
+
+        consume_condition("if")
 
         while self.match(tt.ELSEIF) and not self.is_at_end():
-            self.consume(tt.LEFT_PAREN, "Expect '(' after 'elseif'.")
-            condition = self.expression()
-            self.consume(tt.RIGHT_PAREN, "Expect ')' after elseif condition.")
-
-            then_branch = self.statement()
-            conditions.append((condition, then_branch))
+            consume_condition("elseif")
 
         if self.match(tt.ELSE):
             else_branch = self.statement()
@@ -108,7 +105,14 @@ class Parser:
             if obj: statements.append(obj)
     
         self.consume(tt.RIGHT_BRACE, "Expect '}' after block.")
-        return statements
+        return stmt.Block(statements)
+    
+    def while_statement(self):
+        condition = self.expression()
+        self.consume(tt.LEFT_BRACE, "Expect '{' after expression.")
+        body = self.block()
+
+        return stmt.While(condition, body)
 
     def print_statement(self):
         value = self.expression()
@@ -120,6 +124,46 @@ class Parser:
         self.consume(tt.SEMICOLON, "Expect ';' after expression.")
         return stmt.Expression(expr)
     
+    def for_statement(self):
+        self.consume(tt.LEFT_PAREN, "Expect '(' after for.")
+
+        if self.match(tt.SEMICOLON):
+            initializer = None
+        elif self.match(tt.VAR):
+            initializer = self.var_declaration()
+        else:
+            initializer = self.expr_statement()
+
+        if self.check(tt.SEMICOLON):
+            condition = LiteralValue(True)
+        else:
+            condition = self.expression()
+        self.consume(tt.SEMICOLON, "Expect ';' after loop condition")
+
+        if self.check(tt.SEMICOLON):
+            increment = None
+        else:
+            increment = self.expression()
+
+        self.consume(tt.RIGHT_PAREN, "Expect ')' after for clauses.")
+        self.consume(tt.LEFT_BRACE, "Expect '{' after for loop.")
+        body = self.block()
+
+        if increment is not None:
+            body = stmt.Block([body, stmt.Expression(increment)])
+
+        body = stmt.While(condition, body)
+        if initializer is not None:
+            body = stmt.Block([initializer, body])
+
+        return body
+    
+    # region sinkhole 
+
+    # lowest precedence is here
+    def expression(self):
+        return self.assignment()
+
     def assignment(self):
         expr = self.logical_or()
 
@@ -194,11 +238,12 @@ class Parser:
         return self.primary()
     
     # the return hint clears up 'Unknown' from being in the return type for some reason
-    def primary(self) -> Expr:
+    def primary(self) -> LiteralValue | Grouping | Variable:
         if self.match(tt.TRUE):  return LiteralValue(True)  
         if self.match(tt.FALSE): return LiteralValue(False)
         if self.match(tt.NIL):   return LiteralValue(None)
         
+        # add range
         if self.match(tt.NUMBER, tt.STRING):
             return LiteralValue(self.previous().literal)
         
@@ -212,7 +257,9 @@ class Parser:
         
         raise self.error(self.peek(), "Expected expression.")
 
-    def match(self, *types: tt.TokenType):
+    # region parser tools
+
+    def match(self, *types: tt):
         """Match if the source follows with any of the tokens given"""
         for type in types:
             if self.check(type):
@@ -221,11 +268,11 @@ class Parser:
             
         return False
     
-    def consume(self, type: tt.TokenType, message: str):
+    def consume(self, type: TokenType, message: str):
         if self.check(type): return self.advance()
         raise self.error(self.peek(), message)
     
-    def check(self, type: tt.TokenType):
+    def check(self, type: TokenType):
         if self.is_at_end(): return False
         return self.peek().type == type
 
@@ -237,12 +284,17 @@ class Parser:
         return self.peek().type == tt.EOF
     
     def peek(self):
+        """Retrieve a token at the current index"""
         return self.tokens[self.current]
     
     def previous(self):
+        """Retrieve a token before the current index"""
         return self.tokens[self.current - 1]
             
+    # region errors
+
     def error(self, token: Token, message: str):
+        """Report an error and return an exception class"""
         output.error(token, message)
         return ParseError()
     

@@ -3,10 +3,10 @@ var number = .5;
 /* meow 
 */
 
-var a = func(); // comment
-a.b = 8;
+var a = 5; // comment
+a = a + 1;
 
-var inst = String(a.b);
+var inst = "The value is " + a;
 print inst;
 
 var hello = "i like strawberries";

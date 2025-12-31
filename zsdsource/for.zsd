@@ -1,0 +1,6 @@
+var a = 1;
+
+for (var b = 1; a < 10000; b = 1 + a + b) {
+    a = a * b;
+    print "number: " + a;
+}

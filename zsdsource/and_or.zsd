@@ -1,0 +1,6 @@
+var falsey = false;
+var truthy = "meow";
+
+print falsey and truthy;
+print falsey or truthy;
+print nil or 1;

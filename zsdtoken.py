@@ -1,4 +1,5 @@
 from tokentype import TokenType
+from tokentype import TokenType as tt
 
 class Token:
     def __init__(self, type: TokenType, lexeme: str, literal: object, line: int) -> None:
