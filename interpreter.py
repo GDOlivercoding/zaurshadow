@@ -1,8 +1,10 @@
 from collections.abc import Sequence
+from callables import clock, ZSDCallable, ZSDFunction
 from environment import Environment
 from expr import (
     Assign,
     Binary,
+    Call,
     Grouping,
     LiteralValue,
     Logical,
@@ -13,15 +15,17 @@ from expr import (
 )
 import stmt
 import output
-from output import ZSDRuntimeError
+from output import ReturnException, ZSDRuntimeError
 from tokentype import TokenType as tt
 from zsdtoken import Token
-from typing import Any
+from typing import Any, cast
 
 # region Interpreter
 class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
     def __init__(self) -> None:
-        self.env = Environment()
+        self.globals = Environment()
+        self.env = self.globals
+        self.globals.define("clock", clock)
 
     def interpret(self, statements: Sequence[stmt.Stmt]):
         try: 
@@ -61,8 +65,7 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         # Ruby's implementation
         return value not in (False, None)
 
-    # region visits
-
+    # region visit statements
 
     def visit_block_stmt(self, stmt: stmt.Block) -> None:
         return self.execute_block(stmt.statements, Environment(self.env))
@@ -72,10 +75,9 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         return
     
     def visit_if_stmt(self, stmt: stmt.If) -> None:
-        conditions = stmt.conditions
-        while conditions:
-            condition, body = conditions.pop(0)
-            if self.is_truthy(self.evaluate(condition)):
+        conditions = iter(stmt.conditions)
+        for cond, body in conditions:
+            if self.is_truthy(self.evaluate(cond)):
                 self.execute(body)
                 break
         else:
@@ -92,7 +94,16 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
     
     def visit_var_stmt(self, stmt: stmt.Var) -> None:
         value = self.evaluate(stmt.initializer)
-        self.env.define(stmt.name, value)
+        self.env.define(stmt.name.lexeme, value)
+
+    def visit_function_stmt(self, stmt: stmt.Function) -> None:
+        function = ZSDFunction(stmt, self.env)
+        self.env.define(stmt.name.lexeme, function)
+
+    def visit_return_stmt(self, stmt: stmt.Return) -> None:
+        raise ReturnException(stmt, self.evaluate(stmt.value))
+
+    # region visit exprs
 
     def visit_variable_expr(self, expr: Variable) -> object:
         #print(expr.name.lexeme, "for", self.env.get(expr.name))
@@ -174,3 +185,16 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
                 raise ValueError(f"{expr.operator!r}")
             
         return self.evaluate(expr.right)
+    
+    def visit_call_expr(self, expr: Call) -> object:
+        callee = self.evaluate(expr.callee)
+        arguments = [self.evaluate(arg) for arg in expr.arguments]
+
+        function = cast(ZSDCallable, callee)
+        if (arg_len := len(arguments)) != (arity := function.arity()):
+            raise ZSDRuntimeError(
+                expr.paren, 
+                f"Expected {arity} arguments but received {arg_len} instead."
+            )
+
+        return function.call(self, arguments)

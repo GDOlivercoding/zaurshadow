@@ -1,6 +1,7 @@
 from expr import (
     Assign,
     Binary,
+    Call,
     Expr,
     Grouping,
     LiteralValue,
@@ -73,6 +74,10 @@ class Parser:
             return self.while_statement()
         if self.match(tt.FOR):
             return self.for_statement()
+        if self.match(tt.DECLARE):
+            return self.function("function")
+        if self.match(tt.RETURN):
+            return self.return_statement()
         
         return self.expr_statement()
     
@@ -98,7 +103,12 @@ class Parser:
 
         return stmt.If(conditions, else_branch)
 
+    # deviation: Here i return a Block instead of the raw statement list
     def block(self):
+        """
+        Parse a block: A series of statements in a higher scope surrouded by braces.
+        This method already assumes the left brace has been consumed
+        """
         statements: list[Stmt] = []
         while not self.check(tt.RIGHT_BRACE) and not self.is_at_end():
             obj = self.declaration()
@@ -158,6 +168,34 @@ class Parser:
 
         return body
     
+    def function(self, fn_type: str):
+        name = self.consume(tt.IDENTIFIER, f"Expect {fn_type} name.")
+        self.consume(tt.LEFT_PAREN, f"Expect '(' after {fn_type} name.")
+
+        parameters: list[Token] = []
+        if not self.check(tt.RIGHT_PAREN):
+            parameters.append(self.consume(tt.IDENTIFIER, "Expect parameter name."))
+
+        while self.match(tt.COMMA):
+            if len(parameters) > 255:
+                self.error(self.peek(), f"Maximum arguments passed to a function exceeded.")
+            parameters.append(self.consume(tt.IDENTIFIER, "Expect parameter name."))
+
+        self.consume(tt.RIGHT_PAREN, f"Expect ')' after parameter field ({self.peek()}).")
+        self.consume(tt.LEFT_BRACE, "Expect '{' after %s declaration" % fn_type)
+        body = self.block()
+        return stmt.Function(name, parameters, body.statements)
+    
+    def return_statement(self):
+        keyword = self.previous()
+        if self.match(tt.SEMICOLON):
+            value = LiteralValue(None)
+        else:
+            value = self.expression()
+            self.consume(tt.SEMICOLON, "Expect ';' after expression.")
+
+        return stmt.Return(keyword, value)
+
     # region sinkhole 
 
     # lowest precedence is here
@@ -235,7 +273,21 @@ class Parser:
             right = self.unary()
             return Unary(operator, right)
         
-        return self.primary()
+        return self.call()
+    
+    def call(self):
+        expr = self.primary()
+
+        if self.check(tt.LEFT_PAREN) and isinstance(expr, LiteralValue):
+            self.error(
+                previous := self.tokens[self.current - 2], 
+                f"Expression of type {previous.type.name.lower()!r} is not callable."
+            )
+
+        while self.match(tt.LEFT_PAREN):
+            expr = self.finish_call(expr)
+
+        return expr
     
     # the return hint clears up 'Unknown' from being in the return type for some reason
     def primary(self) -> LiteralValue | Grouping | Variable:
@@ -258,6 +310,22 @@ class Parser:
         raise self.error(self.peek(), "Expected expression.")
 
     # region parser tools
+
+    def finish_call(self, callee: Expr):
+        arguments: list[Expr] = []
+
+        if not self.check(tt.RIGHT_PAREN):
+            arguments.append(self.expression())
+            while self.match(tt.COMMA):
+                arguments.append(self.expression())
+
+        if len(arguments) > 255:
+            # This code intentionally reports an error, but it doesn’t throw an error. 
+            self.error(self.peek(), "Maximum arity of a function exceeded.")
+
+        # We will use this paren token to report errors later
+        paren = self.consume(tt.RIGHT_PAREN, "Expect ')' after arguments.")
+        return Call(callee, paren, arguments)
 
     def match(self, *types: tt):
         """Match if the source follows with any of the tokens given"""

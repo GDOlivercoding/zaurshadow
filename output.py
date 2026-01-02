@@ -1,5 +1,6 @@
 import sys
 from typing import TYPE_CHECKING
+import stmt
 from zsdtoken import Token
 from tokentype import TokenType as tt
 
@@ -11,6 +12,13 @@ class ZSDRuntimeError(RuntimeError):
         self.token = token
         self.message = message
         super().__init__(self.message)
+
+class ReturnException(ZSDRuntimeError):
+    def __init__(self, return_stmt: stmt.Return, value: object) -> None:
+        self.return_stmt = return_stmt
+        self.value = value
+        self.message = "Return statement outside function."
+        super().__init__(self.return_stmt.keyword, self.message)
 
 class ParseError(ValueError): pass
 

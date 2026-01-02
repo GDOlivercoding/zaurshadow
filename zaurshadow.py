@@ -4,7 +4,7 @@ from interpreter import Interpreter
 from scanner import Scanner
 from zsdparser import Parser
 import output
-from stmt import Expression, Print
+from stmt import Expression
 from zsdtoken import Token
 from tokentype import TokenType as tt
 
@@ -35,9 +35,13 @@ def runrepl(source: str):
     
     stmt = None
     if len(statements) == 1 and isinstance(stmt := statements[0], Expression):
-        value = interpreter.evaluate(stmt.expression)
-        interpreter.env.define(last_token, value)
-        print(value)
+        try:
+            value = interpreter.evaluate(stmt.expression)
+        except output.ZSDRuntimeError as e:
+            return output.runtime_error(e)
+        
+        interpreter.env.define(last_token.lexeme, value)
+        return print(value)
     
     interpreter.interpret(statements)
 

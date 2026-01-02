@@ -1,7 +1,7 @@
 import re
 import output
 from zsdtoken import Token
-from tokentype import TokenType as tt
+from tokentype import TokenType as tt, TokenType, keywords
 
 def intable(s: str):
     try:
@@ -143,7 +143,7 @@ class Scanner:
         while re_varname_valid.match(self.peek()): self.advance()
 
         text = self.source[self.start:self.current]
-        type = tt.keywords.get(text, None) or tt.IDENTIFIER
+        type = keywords.get(text, None) or tt.IDENTIFIER
         self.add_token(type)
 
     def match(self, expected_char: str):
@@ -166,7 +166,7 @@ class Scanner:
         self.current += 1
         return result
     
-    def add_token(self, type: tt.TokenType, literal: object = None):
+    def add_token(self, type: TokenType, literal: object = None):
         lexeme = self.source[self.start:self.current]
         self.tokens.append(Token(type, lexeme, literal, self.line))
     

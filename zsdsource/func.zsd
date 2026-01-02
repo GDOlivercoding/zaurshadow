@@ -1,0 +1,19 @@
+declare createMeowFn(meowType) { 
+    declare meow(count) {
+        if count == 0 {
+            print "";
+        } else {
+            var output = meowType; 
+            for (var i = 1; i < count; i = i + 1) { 
+                output = output + " " + meowType; 
+            }
+            print output; 
+        }
+    }
+    return meow;
+}
+
+var mreow = createMeowFn("mreow");
+mreow(6);
+mreow(0);
+mreow(2);

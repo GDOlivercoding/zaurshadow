@@ -7,6 +7,7 @@ class Environment:
         self.parent_scope = parent_scope
         self.values: dict[str, object] = {}
 
+    # ... = a;
     def get(self, name: Token):
         if name.lexeme in self.values:
             return self.values[name.lexeme]
@@ -17,9 +18,11 @@ class Environment:
         raise ZSDRuntimeError(name, f"Undefined variable {name.lexeme!r}.")
 
     # make it impossible to redefine a variable later
-    def define(self, name: Token, value: object):
-        self.values[name.lexeme] = value
+    # var a  = ...;
+    def define(self, name: str, value: object):
+        self.values[name] = value
 
+    # a = ...;
     def assign(self, name: Token, value: object):
         if name.lexeme in self.values:
             self.values[name.lexeme] = value
@@ -31,4 +34,4 @@ class Environment:
         raise ZSDRuntimeError(name, f"Undefined variable {name.lexeme!r}.")
     
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} parent={self.parent_scope} values={self.values}"
+        return f"<{self.__class__.__name__} parent={self.parent_scope} values={self.values}>"

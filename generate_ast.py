@@ -10,6 +10,7 @@ def main():
     define_ast(output_dir, "Expr", {
         "Assign": [("name", "Token"), ("value", "Expr")],
         "Binary": [("left", "Expr"), ("operator", "Token"), ("right", "Expr")],
+        "Call": [("callee", "Expr"), ("paren", "Token"), ("arguments", "list[Expr]")],
         "Grouping": [("expression", "Expr")],
         "Logical": [("left", "Expr"), ("operator", "Token"), ("right", "Expr")],
         "LiteralValue": [("value", "object")],
@@ -19,9 +20,11 @@ def main():
 
     define_ast(output_dir, "Stmt", {
         "Expression": [("expression", "Expr")],
+        "Function": [("name", "Token"), ("params", "list[Token]"), ("body", "list[Stmt]")],
         "If": [("conditions", "list[tuple[Expr, Stmt]]"), ("else_branch", "Stmt | None = None")],
         "Block": [("statements", "list[Stmt]")],
         "Print": [("expression", "Expr")],
+        "Return": [("keyword", "Token"), ("value", "Expr")],
         "Var": [("name", "Token"), ("initializer", "Expr")],
         "While": [("condition", "Expr"), ("body", "Stmt")]
     })
@@ -73,7 +76,7 @@ def define_type(write: Callable, basename: str, classname: str, field_list: list
     write(f"        return visitor.visit_{classname.lower()}_{basename.lower()}(self)\n")
 
     write( "    def __repr__(self) -> str:")
-    write(f"        return f\"<{classname} {" ".join(["%s={self.%s}" % (name, name) for name,_ in field_list])}\"")
+    write(f"        return f\"<{classname} {" ".join(["%s={self.%s}" % (name, name) for name,_ in field_list])}>\"")
 
 if __name__ == "__main__":
     main()
