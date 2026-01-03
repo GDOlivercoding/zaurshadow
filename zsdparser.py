@@ -304,6 +304,10 @@ class Parser:
             self.consume(tt.RIGHT_PAREN, "Expected ')' after expression.")
             return Grouping(expr)
         
+        
+        #if self.match(tt.DECLARE):
+        #    return self.expression_function()
+
         if self.match(tt.IDENTIFIER):
             return Variable(self.previous())
         
@@ -326,6 +330,31 @@ class Parser:
         # We will use this paren token to report errors later
         paren = self.consume(tt.RIGHT_PAREN, "Expect ')' after arguments.")
         return Call(callee, paren, arguments)
+    
+    #def expression_function(self):
+    #    if self.match(tt.IDENTIFIER):
+    #        name = self.previous()
+    #    else:
+    #        declare = self.previous()
+    #        name = Token(tt.IDENTIFIER, "<anonymous>", None, declare.line)
+    #
+    #    if self.match(tt.LEFT_PAREN):
+    #        parameters: list[Token] = []
+    #        if not self.check(tt.RIGHT_PAREN):
+    #            parameters.append(self.consume(tt.IDENTIFIER, "Expect parameter name."))
+    #
+    #        while self.match(tt.COMMA):
+    #            if len(parameters) > 255:
+    #                self.error(self.peek(), f"Maximum arguments passed to a function exceeded.")
+    #            parameters.append(self.consume(tt.IDENTIFIER, "Expect parameter name."))
+    #
+    #        self.consume(tt.RIGHT_PAREN, f"Expect ')' after parameter field ({self.peek()}).")
+    #    else:
+    #        parameters = []
+    #
+    #    self.consume(tt.LEFT_BRACE, "Expect '{' after function declaration")
+    #    body = self.block()
+    #    return stmt.Function(name, parameters, body.statements)
 
     def match(self, *types: tt):
         """Match if the source follows with any of the tokens given"""
