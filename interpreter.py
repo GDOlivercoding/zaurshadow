@@ -26,6 +26,7 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         self.globals = Environment()
         self.env = self.globals
         self.globals.define("clock", clock)
+        self.locals: dict[Expr, int] = {}
 
     def interpret(self, statements: Sequence[stmt.Stmt]):
         try: 
@@ -43,6 +44,9 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
     
     def execute(self, stmt: stmt.Stmt):
         return stmt.accept(self)
+    
+    def resolve(self, expr: Expr, depth: int):
+        self.locals[expr] = depth
     
     def check_type(self, operand: object, operator: Token):
         if isinstance(operand, (float, int)): return
@@ -100,18 +104,27 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         function = ZSDFunction(stmt, self.env)
         self.env.define(stmt.name.lexeme, function)
 
-    def visit_return_stmt(self, stmt: stmt.Return) -> None:
+    def visit_return_stmt(self, stmt: stmt.Return):
         raise ReturnException(stmt, self.evaluate(stmt.value))
 
     # region visit exprs
 
     def visit_variable_expr(self, expr: Variable) -> object:
         #print(expr.name.lexeme, "for", self.env.get(expr.name))
-        return self.env.get(expr.name)
+        return self.lookup_variable(expr.name, expr)
+    
+    def lookup_variable(self, name: Token, expr: Expr):
+        distance = self.locals.get(expr, None)
+        if distance is not None:
+            return self.env.get(name, distance)
     
     def visit_assign_expr(self, expr: Assign) -> object:
         value = self.evaluate(expr.value)
-        self.env.assign(expr.name, value)
+        
+        distance = self.locals.get(expr, None)
+        if distance is not None:
+            self.env.assign(expr.name, value, distance)
+
         return value
 
     def visit_literalvalue_expr(self, expr: LiteralValue) -> object:

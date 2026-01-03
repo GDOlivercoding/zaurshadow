@@ -1,8 +1,11 @@
 from pathlib import Path
 import sys
-from interpreter import Interpreter
+
 from scanner import Scanner
 from zsdparser import Parser
+from resolver import Resolver
+from interpreter import Interpreter
+
 import output
 from stmt import Expression
 from zsdtoken import Token
@@ -28,6 +31,13 @@ def runrepl(source: str):
 
     parser = Parser(tokens)
     statements = parser.parse()
+
+    if output.had_error:
+        output.reset()
+        return
+    
+    resolver = Resolver(interpreter)
+    resolver.resolve(statements)
 
     if output.had_error:
         output.reset()
@@ -62,6 +72,13 @@ def run(source: str):
 
     parser = Parser(tokens)
     statements = parser.parse()
+
+    if output.had_error:
+        output.reset()
+        return
+    
+    resolver = Resolver(interpreter)
+    resolver.resolve(statements)
 
     if output.had_error:
         output.reset()

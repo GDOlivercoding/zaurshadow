@@ -1,0 +1,16 @@
+// This file doesn't get executed
+
+// error
+return "return at the top";
+
+declare mul(a, b) {
+    // error
+    var unusedVariable;
+    return a * b;
+}
+
+{
+    var text = "damn is the pls no hro";
+    // error 2x
+    var text = "lorem ipsum sit dolor amet";
+}
