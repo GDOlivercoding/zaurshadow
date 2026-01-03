@@ -43,6 +43,7 @@ class TokenType(Enum):
     VAR = auto()
     WHILE = auto()
     DO = auto()
+    INHERITS = auto()
 
 keywords: dict[str, TokenType] = {
     "and": TokenType.AND,
@@ -62,5 +63,6 @@ keywords: dict[str, TokenType] = {
     "true": TokenType.TRUE,
     "var": TokenType.VAR,
     "while": TokenType.WHILE,
-    "do": TokenType.DO
+    "do": TokenType.DO,
+    "inherits": TokenType.INHERITS
 }
