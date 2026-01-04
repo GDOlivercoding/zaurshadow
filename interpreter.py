@@ -15,6 +15,7 @@ from expr import (
 )
 import stmt
 import output
+from literals import true, false, nil
 from output import ReturnException, ZSDRuntimeError
 from tokentype import TokenType as tt
 from zsdtoken import Token
@@ -36,8 +37,10 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
             output.runtime_error(e)
 
     def shadowize(self, object: object):
-        if object is None: return "nil"
-        return str(object)
+        if object is None: return nil
+        if object is True: return true
+        if object is False: return false
+        return object
 
     def evaluate(self, expr: Expr):
         return expr.accept(self)
@@ -67,7 +70,7 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
 
     def is_truthy(self, value: object):
         # Ruby's implementation
-        return value not in (False, None)
+        return bool(value)
 
     # region visit statements
 
@@ -117,6 +120,8 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         distance = self.locals.get(expr, None)
         if distance is not None:
             return self.env.get(name, distance)
+        else:
+            return self.globals.get(name)
     
     def visit_assign_expr(self, expr: Assign) -> object:
         value = self.evaluate(expr.value)
@@ -136,49 +141,46 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
     def visit_unary_expr(self, expr: Unary) -> object:
         right: Any = self.evaluate(expr.right)
 
-        #if not isinstance(right, (float, int)):
-        #    output.error(expr.operator, "Non number")
-
         match expr.operator.type:
             case tt.MINUS:
                 return -right
             case tt.PLUS:
                 return abs(right)
             case tt.BANG:
-                return not self.is_truthy(right)
+                return self.shadowize(not self.is_truthy(right))
             
         raise ValueError
     
     def visit_binary_expr(self, expr: Binary) -> object:
-        #print("bin", expr.left, expr.right)
         left: Any = self.evaluate(expr.left)
         right: Any = self.evaluate(expr.right)
+        shadowize = self.shadowize
 
         match expr.operator.type:
             case tt.MINUS:
-                return left - right
+                return shadowize(left - right)
             case tt.STAR:
-                return left * right
+                return shadowize(left * right)
             case tt.SLASH:
-                return left / right
+                return shadowize(left / right)
             case tt.PLUS:
                 #print("plus", type(left) is type(right))
                 if isinstance(left, str) or isinstance(right, str):
                     return str(left) + str(right)
                 if isinstance(left, (float, int)) and isinstance(right, (float, int)):
-                    return left + right
+                    return shadowize(left + right)
             case tt.GREATER:
-                return left > right
+                return shadowize(left > right)
             case tt.GREATER_EQUAL:
-                return left >= right
+                return shadowize(left >= right)
             case tt.LESS:
-                return left < right
+                return shadowize(left < right)
             case tt.LESS_EQUAL:
-                return left <= right
+                return shadowize(left <= right)
             case tt.EQUAL_EQUAL:
-                return left == right
+                return shadowize(left == right)
             case tt.BANG_EQUAL:
-                return left != right
+                return shadowize(left != right)
             
         raise ZSDRuntimeError(expr.operator, "Invalid operand types.")
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 import time
 from typing import TYPE_CHECKING
 from environment import Environment
@@ -43,15 +44,19 @@ class ZSDFunction(ZSDCallable):
 
         return f"<function {decl.name.lexeme}({", ".join(params)})>"
 
-# Native implementations in Python should be later moved to a different file or namespace
-class Clock(ZSDCallable):
+class ZSDNativeFunction(ZSDCallable):
+    def __init__(self, arity: int, name: str, callable: Callable[[Interpreter, list[object]], object]) -> None:
+        self._arity = arity
+        self.name = name
+        self.callable = callable
+
     def arity(self) -> int:
-        return 0
+        return self._arity
     
     def call(self, interpreter: Interpreter, arguments: list[object]) -> object:
-        return time.perf_counter()
+        return self.callable(interpreter, arguments)
     
     def __repr__(self) -> str:
-        return "<native clock()>"
+        return f"<native {self.name}()>"
     
-clock = Clock()
+clock = ZSDNativeFunction(0, "clock", lambda i, a: time.perf_counter())

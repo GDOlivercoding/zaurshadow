@@ -15,6 +15,7 @@ from zsdtoken import Token
 
 import output
 import stmt
+from literals import false, true, nil
 from tokentype import TokenType as tt, TokenType
 
 class Parser:
@@ -291,9 +292,9 @@ class Parser:
     
     # the return hint clears up 'Unknown' from being in the return type for some reason
     def primary(self) -> LiteralValue | Grouping | Variable:
-        if self.match(tt.TRUE):  return LiteralValue(True)  
-        if self.match(tt.FALSE): return LiteralValue(False)
-        if self.match(tt.NIL):   return LiteralValue(None)
+        if self.match(tt.TRUE):  return LiteralValue(true)  
+        if self.match(tt.FALSE): return LiteralValue(false)
+        if self.match(tt.NIL):   return LiteralValue(nil)
         
         # add range
         if self.match(tt.NUMBER, tt.STRING):

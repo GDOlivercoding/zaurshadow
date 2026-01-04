@@ -55,7 +55,6 @@ def runrepl(source: str):
     
     interpreter.interpret(statements)
 
-    #print(interpreter.env)
     output.reset()
 
 def runfile(file: Path):

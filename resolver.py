@@ -73,7 +73,7 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
     # region expr visits
 
     def visit_variable_expr(self, expr: expr.Variable) -> None:
-        if self.scopes and not self.scopes[-1][expr.name.lexeme]:
+        if self.scopes and not self.scopes[-1].get(expr.name.lexeme, True):
             output.error(expr.name, "Unbound local variable.")
 
         self.resolve_local(expr, expr.name)
