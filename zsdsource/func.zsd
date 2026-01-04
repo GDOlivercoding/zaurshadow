@@ -22,7 +22,7 @@ declare bigCombineFunc(a, b, c, d, e ,f,g , h, i, j, k, l) {
     return a+b+c+d+e+f+g+h+i+j+k+l;
 }
 
-// Regardless of how the argument listed is formed, the output is well formed.
+// Regardless of how the argument list is formed, the output is well formed.
 // Also, the maximum amount of displayed parameters is 9 (the tenth parameter is shown as an ellipsis).
 print bigCombineFunc;
 print bigCombineFunc(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
