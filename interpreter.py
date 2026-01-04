@@ -1,13 +1,17 @@
 from collections.abc import Sequence
 from callables import clock, ZSDCallable, ZSDFunction
+from classes import ZSDClass, ZSDInstance
 from environment import Environment
 from expr import (
     Assign,
     Binary,
     Call,
+    Get,
     Grouping,
     LiteralValue,
     Logical,
+    Set,
+    This,
     Unary,
     Variable,
     Visitor as ExprVisitor,
@@ -109,17 +113,27 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
 
     def visit_return_stmt(self, stmt: stmt.Return):
         raise ReturnException(stmt, self.evaluate(stmt.value))
+    
+    def visit_class_stmt(self, stmt: stmt.Class) -> None:
+        self.env.define(stmt.name.lexeme, None)
+
+        methods: dict[str, ZSDFunction] = {}
+        for method in stmt.methods:
+            function = ZSDFunction(method, self.env, method.name.lexeme == "init")
+            methods[method.name.lexeme] = function
+
+        klass = ZSDClass(stmt.name.lexeme, methods)
+        self.env.assign(stmt.name, klass)
 
     # region visit exprs
 
     def visit_variable_expr(self, expr: Variable) -> object:
-        #print(expr.name.lexeme, "for", self.env.get(expr.name))
         return self.lookup_variable(expr.name, expr)
     
     def lookup_variable(self, name: Token, expr: Expr):
         distance = self.locals.get(expr, None)
         if distance is not None:
-            return self.env.get(name, distance)
+            return self.env.get_at(name.lexeme, distance)
         else:
             return self.globals.get(name)
     
@@ -213,3 +227,24 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
             )
 
         return function.call(self, arguments)
+    
+    def visit_get_expr(self, expr: Get) -> object:
+        object = self.evaluate(expr.object)
+
+        if isinstance(object, ZSDInstance):
+            return object.get(expr.name)
+        
+        raise ZSDRuntimeError(expr.name, "Invalid attribute accessor.")
+        
+    def visit_set_expr(self, expr: Set) -> object:
+        object = self.evaluate(expr.object)
+
+        if not isinstance(object, ZSDInstance):
+            raise ZSDRuntimeError(expr.name, "Invalid setter.")
+        
+        value = self.evaluate(expr.value)
+        object.set(expr.name, value)
+        return value
+    
+    def visit_this_expr(self, expr: This) -> object:    
+        return self.lookup_variable(expr.keyword, expr)

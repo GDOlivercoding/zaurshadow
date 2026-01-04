@@ -8,10 +8,7 @@ class Environment:
         self.values: dict[str, object] = {}
 
     # ... = a;
-    def get(self, name: Token, distance: int | None = None):
-        if distance is not None:
-            return self.ancestor(distance).values[name.lexeme]
-
+    def get(self, name: Token):
         if name.lexeme in self.values:
             return self.values[name.lexeme]
         
@@ -19,6 +16,9 @@ class Environment:
             return self.parent_scope.get(name)
         
         raise ZSDRuntimeError(name, f"Undefined variable {name.lexeme!r}.")
+    
+    def get_at(self, name: str, distance: int):
+        return self.ancestor(distance).values[name]
 
     # make it impossible to redefine a variable later
     # var a  = ...;

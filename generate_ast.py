@@ -11,6 +11,9 @@ def main():
         "Assign": [("name", "Token"), ("value", "Expr")],
         "Binary": [("left", "Expr"), ("operator", "Token"), ("right", "Expr")],
         "Call": [("callee", "Expr"), ("paren", "Token"), ("arguments", "list[Expr]")],
+        "Get": [("object", "Expr"), ("name", "Token")],
+        "Set": [("object", "Expr"), ("name", "Token"), ("value", "Expr")],
+        "This": [("keyword", "Token")],
         "Grouping": [("expression", "Expr")],
         "Logical": [("left", "Expr"), ("operator", "Token"), ("right", "Expr")],
         "LiteralValue": [("value", "object")],
@@ -23,6 +26,7 @@ def main():
         "Function": [("name", "Token"), ("params", "list[Token]"), ("body", "list[Stmt]")],
         "If": [("conditions", "list[tuple[Expr, Stmt]]"), ("else_branch", "Stmt | None = None")],
         "Block": [("statements", "list[Stmt]")],
+        "Class": [("name", "Token"), ("methods", "list[Function]")],
         "Print": [("expression", "Expr")],
         "Return": [("keyword", "Token"), ("value", "Expr")],
         "Var": [("name", "Token"), ("initializer", "Expr")],
@@ -63,10 +67,12 @@ def define_visitor(write: Callable, baseclass: str, types: dict[str, list[tuple[
         write(f"    def visit_{subclass.lower()}_{baseclass.lower()}(self, {baseclass.lower()}: {subclass}) -> T: ...")
 
 def define_type(write: Callable, basename: str, classname: str, field_list: list[tuple[str, str]]):
-    if basename == "LiteralValue":
-        write("# 'Literal' collides with typing.Literal")
+    if classname == "LiteralValue":
+        write("\n# 'Literal' collides with typing.Literal")
+    else:
+        write("")
 
-    write(f"\nclass {classname}({basename}):")
+    write(f"class {classname}({basename}):")
     write(f"    def __init__(self{", " + ", ".join([f"{name}: {type}" for name, type in field_list])}):")
 
     for name, _ in field_list:

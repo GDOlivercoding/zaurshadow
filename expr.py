@@ -7,6 +7,9 @@ class Visitor[T](Protocol):
     def visit_assign_expr(self, expr: Assign) -> T: ...
     def visit_binary_expr(self, expr: Binary) -> T: ...
     def visit_call_expr(self, expr: Call) -> T: ...
+    def visit_get_expr(self, expr: Get) -> T: ...
+    def visit_set_expr(self, expr: Set) -> T: ...
+    def visit_this_expr(self, expr: This) -> T: ...
     def visit_grouping_expr(self, expr: Grouping) -> T: ...
     def visit_logical_expr(self, expr: Logical) -> T: ...
     def visit_literalvalue_expr(self, expr: LiteralValue) -> T: ...
@@ -53,6 +56,39 @@ class Call(Expr):
     def __repr__(self) -> str:
         return f"<Call callee={self.callee} paren={self.paren} arguments={self.arguments}>"
 
+class Get(Expr):
+    def __init__(self, object: Expr, name: Token):
+        self.object = object
+        self.name = name
+
+    def accept[T](self, visitor: Visitor[T]) -> T:
+        return visitor.visit_get_expr(self)
+
+    def __repr__(self) -> str:
+        return f"<Get object={self.object} name={self.name}>"
+
+class Set(Expr):
+    def __init__(self, object: Expr, name: Token, value: Expr):
+        self.object = object
+        self.name = name
+        self.value = value
+
+    def accept[T](self, visitor: Visitor[T]) -> T:
+        return visitor.visit_set_expr(self)
+
+    def __repr__(self) -> str:
+        return f"<Set object={self.object} name={self.name} value={self.value}>"
+
+class This(Expr):
+    def __init__(self, keyword: Token):
+        self.keyword = keyword
+
+    def accept[T](self, visitor: Visitor[T]) -> T:
+        return visitor.visit_this_expr(self)
+
+    def __repr__(self) -> str:
+        return f"<This keyword={self.keyword}>"
+
 class Grouping(Expr):
     def __init__(self, expression: Expr):
         self.expression = expression
@@ -75,6 +111,7 @@ class Logical(Expr):
     def __repr__(self) -> str:
         return f"<Logical left={self.left} operator={self.operator} right={self.right}>"
 
+# 'Literal' collides with typing.Literal
 class LiteralValue(Expr):
     def __init__(self, value: object):
         self.value = value

@@ -3,9 +3,12 @@ from expr import (
     Binary,
     Call,
     Expr,
+    Get,
     Grouping,
     LiteralValue,
     Logical,
+    Set,
+    This,
     Unary,
     Variable
 )
@@ -79,6 +82,8 @@ class Parser:
             return self.function("function")
         if self.match(tt.RETURN):
             return self.return_statement()
+        if self.match(tt.CLASS):
+            return self.class_declaration()
         
         return self.expr_statement()
     
@@ -196,6 +201,17 @@ class Parser:
             self.consume(tt.SEMICOLON, "Expect ';' after expression.")
 
         return stmt.Return(keyword, value)
+    
+    def class_declaration(self):
+        name = self.consume(tt.IDENTIFIER, "Expect class name.")
+        self.consume(tt.LEFT_BRACE, "Expect '{' after class name.")
+
+        methods: list[stmt.Function] = []
+        while not self.check(tt.RIGHT_BRACE) and not self.is_at_end():
+            methods.append(self.function("method"))
+
+        self.consume(tt.RIGHT_BRACE, "Expect '}' after class body.")
+        return stmt.Class(name, methods)
 
     # region sinkhole 
 
@@ -211,8 +227,9 @@ class Parser:
             value = self.assignment()
 
             if isinstance(expr, Variable):
-                name = expr.name
-                return Assign(name, value)
+                return Assign(expr.name, value)
+            elif isinstance(expr, Get):
+                return Set(expr.object, expr.name, value)
             
             raise self.error(equals, "Invalid assignment target.")
         
@@ -285,13 +302,19 @@ class Parser:
                 f"Expression of type {previous.type.name.lower()!r} is not callable."
             )
 
-        while self.match(tt.LEFT_PAREN):
-            expr = self.finish_call(expr)
+        while True:
+            if self.match(tt.LEFT_PAREN):
+                expr = self.finish_call(expr)
+            elif self.match(tt.DOT):
+                name = self.consume(tt.IDENTIFIER, "Expect identifier after attribute accessor.")
+                expr = Get(expr, name)
+            else:
+                break
 
         return expr
     
     # the return hint clears up 'Unknown' from being in the return type for some reason
-    def primary(self) -> LiteralValue | Grouping | Variable:
+    def primary(self) -> Expr:
         if self.match(tt.TRUE):  return LiteralValue(true)  
         if self.match(tt.FALSE): return LiteralValue(false)
         if self.match(tt.NIL):   return LiteralValue(nil)
@@ -305,6 +328,8 @@ class Parser:
             self.consume(tt.RIGHT_PAREN, "Expected ')' after expression.")
             return Grouping(expr)
         
+        if self.match(tt.THIS):
+            return This(self.previous())
         
         #if self.match(tt.DECLARE):
         #    return self.expression_function()

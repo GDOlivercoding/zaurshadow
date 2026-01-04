@@ -1,5 +1,4 @@
 from enum import Enum, auto
-
 import expr
 from expr import Expr
 import stmt
@@ -11,9 +10,15 @@ import output
 class Scope(Enum):
     none = auto()
     function = auto()
+    method = auto()
+    initializer = auto()
+
+class Class(Enum):
+    none = auto()
+    klass = auto()
 
 class ScopeEntry:
-    def __init__(self, token: Token, ready=False, used=False) -> None:
+    def __init__(self, token: Token | None = None, ready=False, used=False) -> None:
         # This attribute points to the variable identifier at declaration
         self.token = token
         self.ready = ready
@@ -25,6 +30,7 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
         # [{varname: str, meta: {ready: bool, used: bool}}]
         self.scopes: list[dict[str, ScopeEntry]] = []
         self.current_scope: Scope = Scope.none
+        self.current_class: Class = Class.none
 
     # region stmt visits
 
@@ -59,8 +65,11 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
     def visit_return_stmt(self, stmt: stmt.Return) -> None:
         if self.current_scope == Scope.none:
             output.error(stmt.keyword, "Return outside function.")
-            
+
         if stmt.value:
+            if self.current_scope == Scope.initializer:
+                output.error(stmt.keyword, "Returning a value from an initializer is forbidden.")
+
             self.resolve(stmt.value)
 
     def visit_print_stmt(self, stmt: stmt.Print) -> None:
@@ -69,6 +78,25 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
     def visit_while_stmt(self, stmt: stmt.While) -> None:
         self.resolve(stmt.condition)
         self.resolve(stmt.body)
+
+    def visit_class_stmt(self, stmt: stmt.Class) -> None:
+        enclosing_class = self.current_class
+        self.current_class = Class.klass
+
+        self.declare(stmt.name)
+        self.define(stmt.name)
+
+        self.new_scope()
+        self.scopes[-1]["this"] = ScopeEntry()
+
+        for method in stmt.methods:
+            self.resolve_function(
+                method, 
+                Scope.initializer if method.name.lexeme == "init" else Scope.method
+            )
+
+        self.pop_scope()
+        self.current_class = enclosing_class
 
     # region expr visits
 
@@ -98,11 +126,25 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
     def visit_grouping_expr(self, expr: expr.Grouping) -> None:
         self.resolve(expr.expression)
 
-    visit_literalvalue_expr = lambda self, expr: None
+    def visit_literalvalue_expr(self, expr: expr.LiteralValue) -> None:
+        pass
 
     def visit_logical_expr(self, expr: expr.Logical) -> None:
         self.resolve(expr.left)
         self.resolve(expr.right)
+
+    def visit_get_expr(self, expr: expr.Get) -> None:
+        self.resolve(expr.object)
+
+    def visit_set_expr(self, expr: expr.Set) -> None:
+        self.resolve(expr.value)
+        self.resolve(expr.object)
+
+    def visit_this_expr(self, expr: expr.This) -> None:
+        if self.current_class == Class.none:
+            output.error(expr.keyword, "'this' outside class.")
+
+        self.resolve_local(expr, expr.keyword)
 
     # region utilities
 
@@ -140,16 +182,16 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
     def pop_scope(self):
         scope = self.scopes.pop()
         for entry in scope.values():
-            if not entry.used:
+            if not entry.used and entry.token:
                 output.error(entry.token, f"Local variable unused.")
 
     def declare(self, name: Token):
         if not self.scopes: return
         scope = self.scopes[-1]
 
-        if name.lexeme in scope:
+        if name.lexeme in scope and (token := scope[name.lexeme].token):
             # TODO: Maybe change this error message in the future lol
-            return output.error(scope[name.lexeme].token, "Variable redeclaration is forbidden.")
+            return output.error(token, "Variable redeclaration is forbidden.")
 
         scope[name.lexeme] = ScopeEntry(name, False)
 

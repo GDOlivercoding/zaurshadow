@@ -9,6 +9,7 @@ class Visitor[T](Protocol):
     def visit_function_stmt(self, stmt: Function) -> T: ...
     def visit_if_stmt(self, stmt: If) -> T: ...
     def visit_block_stmt(self, stmt: Block) -> T: ...
+    def visit_class_stmt(self, stmt: Class) -> T: ...
     def visit_print_stmt(self, stmt: Print) -> T: ...
     def visit_return_stmt(self, stmt: Return) -> T: ...
     def visit_var_stmt(self, stmt: Var) -> T: ...
@@ -61,6 +62,17 @@ class Block(Stmt):
 
     def __repr__(self) -> str:
         return f"<Block statements={self.statements}>"
+
+class Class(Stmt):
+    def __init__(self, name: Token, methods: list[Function]):
+        self.name = name
+        self.methods = methods
+
+    def accept[T](self, visitor: Visitor[T]) -> T:
+        return visitor.visit_class_stmt(self)
+
+    def __repr__(self) -> str:
+        return f"<Class name={self.name} methods={self.methods}>"
 
 class Print(Stmt):
     def __init__(self, expression: Expr):

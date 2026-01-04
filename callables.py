@@ -9,6 +9,7 @@ import stmt
 
 if TYPE_CHECKING:
     from interpreter import Interpreter
+    from classes import ZSDInstance
 
 class ZSDCallable(ABC):
     @abstractmethod
@@ -17,9 +18,10 @@ class ZSDCallable(ABC):
     def arity(self) -> int: ...
 
 class ZSDFunction(ZSDCallable):
-    def __init__(self, declaration: stmt.Function, closure: Environment) -> None:
+    def __init__(self, declaration: stmt.Function, closure: Environment, is_init: bool = False) -> None:
         self.declaration = declaration
         self.closure = closure
+        self.is_init = is_init
 
     def arity(self) -> int:
         return len(self.declaration.params)
@@ -33,7 +35,18 @@ class ZSDFunction(ZSDCallable):
         try:
             interpreter.execute_block(self.declaration.body, env)
         except ReturnException as exc:
+            if self.is_init:
+                return self.closure.get_at("this", 0)
+
             return exc.value
+        
+        if self.is_init: 
+            return self.closure.get_at("this", 0)
+        
+    def bind(self, instance: "ZSDInstance"):
+        env = Environment(self.closure)
+        env.define("this", instance)
+        return type(self)(self.declaration, env)
 
     def __repr__(self) -> str:
         decl = self.declaration
