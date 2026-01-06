@@ -8,6 +8,7 @@ from expr import (
     LiteralValue,
     Logical,
     Set,
+    Super,
     This,
     Unary,
     Variable
@@ -179,7 +180,7 @@ class Parser:
         self.consume(tt.LEFT_PAREN, f"Expect '(' after {fn_type} name.")
 
         parameters: list[Token] = []
-        if not self.check(tt.RIGHT_PAREN):
+        if not self.check(tt.RIGHT_PAREN) and not self.is_at_end():
             parameters.append(self.consume(tt.IDENTIFIER, "Expect parameter name."))
 
         while self.match(tt.COMMA):
@@ -187,7 +188,7 @@ class Parser:
                 self.error(self.peek(), f"Maximum arguments passed to a function exceeded.")
             parameters.append(self.consume(tt.IDENTIFIER, "Expect parameter name."))
 
-        self.consume(tt.RIGHT_PAREN, f"Expect ')' after parameter field ({self.peek()}).")
+        self.consume(tt.RIGHT_PAREN, f"Expect ')' after parameter field.")
         self.consume(tt.LEFT_BRACE, "Expect '{' after %s declaration" % fn_type)
         body = self.block()
         return stmt.Function(name, parameters, body.statements)
@@ -204,6 +205,11 @@ class Parser:
     
     def class_declaration(self):
         name = self.consume(tt.IDENTIFIER, "Expect class name.")
+
+        superclass = None
+        if self.match(tt.LESS):
+            superclass = Variable(self.consume(tt.IDENTIFIER, "Expect superclass name."))
+
         self.consume(tt.LEFT_BRACE, "Expect '{' after class name.")
 
         methods: list[stmt.Function] = []
@@ -211,7 +217,7 @@ class Parser:
             methods.append(self.function("method"))
 
         self.consume(tt.RIGHT_BRACE, "Expect '}' after class body.")
-        return stmt.Class(name, methods)
+        return stmt.Class(name, methods, superclass)
 
     # region sinkhole 
 
@@ -330,6 +336,12 @@ class Parser:
         
         if self.match(tt.THIS):
             return This(self.previous())
+        
+        if self.match(tt.SUPER):
+            keyword = self.previous()
+            self.consume(tt.DOT, "Expect attribute access after 'super'.")
+            method = self.consume(tt.IDENTIFIER, "Expect identifier after attribute accessor.")
+            return Super(keyword, method)
         
         #if self.match(tt.DECLARE):
         #    return self.expression_function()

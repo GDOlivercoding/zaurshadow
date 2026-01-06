@@ -9,6 +9,7 @@ class Visitor[T](Protocol):
     def visit_call_expr(self, expr: Call) -> T: ...
     def visit_get_expr(self, expr: Get) -> T: ...
     def visit_set_expr(self, expr: Set) -> T: ...
+    def visit_super_expr(self, expr: Super) -> T: ...
     def visit_this_expr(self, expr: This) -> T: ...
     def visit_grouping_expr(self, expr: Grouping) -> T: ...
     def visit_logical_expr(self, expr: Logical) -> T: ...
@@ -78,6 +79,17 @@ class Set(Expr):
 
     def __repr__(self) -> str:
         return f"<Set object={self.object} name={self.name} value={self.value}>"
+
+class Super(Expr):
+    def __init__(self, keyword: Token, method: Token):
+        self.keyword = keyword
+        self.method = method
+
+    def accept[T](self, visitor: Visitor[T]) -> T:
+        return visitor.visit_super_expr(self)
+
+    def __repr__(self) -> str:
+        return f"<Super keyword={self.keyword} method={self.method}>"
 
 class This(Expr):
     def __init__(self, keyword: Token):

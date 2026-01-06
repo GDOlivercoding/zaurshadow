@@ -7,12 +7,17 @@ if TYPE_CHECKING:
     from interpreter import Interpreter
 
 class ZSDClass(ZSDCallable):
-    def __init__(self, name: str, methods: dict[str, ZSDFunction]) -> None:
+    def __init__(self, name: str, methods: dict[str, ZSDFunction], superclass: "ZSDClass | None" = None) -> None:
         self.name = name
         self.methods = methods
+        self.superclass = superclass
 
-    def find_method(self, name: str):
-        return self.methods.get(name, None)
+    def find_method(self, name: str) -> ZSDFunction | None:
+        method = self.methods.get(name)
+        if method:
+            return method
+        
+        return self.superclass and self.superclass.find_method(name)
 
     def arity(self) -> int:
         init = self.find_method("init")
@@ -35,7 +40,7 @@ class ZSDClass(ZSDCallable):
 class ZSDInstance:
     def __init__(self, klass: ZSDClass) -> None:
         self.klass = klass
-        self.fields: dict[str, object] = {}
+        self.fields: dict[str, object] = {"__class__": self.klass}
 
     def get(self, name: Token):
         if name.lexeme in self.fields:

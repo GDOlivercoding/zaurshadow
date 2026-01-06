@@ -1,4 +1,6 @@
 class Person {
+    // init is the constructor, always returns `this` by default 
+    // (you cannot return a value from a constructor)
     init(name) {
         this.name = name;
     }
@@ -10,3 +12,14 @@ class Person {
 
 var vanessa = Person("vanessa");
 vanessa.greet();
+
+class SillyPerson < Person {
+    greet() {
+        super.greet();
+        print "Meowzers~ >.<!";
+    }
+}
+
+var boykisser = SillyPerson("boykisser");
+boykisser.greet();
+print boykisser.__class__;

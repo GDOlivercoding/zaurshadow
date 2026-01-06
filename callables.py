@@ -4,7 +4,7 @@ from collections.abc import Callable
 import time
 from typing import TYPE_CHECKING
 from environment import Environment
-from output import ReturnException
+from output import ReturnException, ZSDRuntimeError
 import stmt
 
 if TYPE_CHECKING:
@@ -22,6 +22,7 @@ class ZSDFunction(ZSDCallable):
         self.declaration = declaration
         self.closure = closure
         self.is_init = is_init
+        self.name = "function"
 
     def arity(self) -> int:
         return len(self.declaration.params)
@@ -46,6 +47,7 @@ class ZSDFunction(ZSDCallable):
     def bind(self, instance: "ZSDInstance"):
         env = Environment(self.closure)
         env.define("this", instance)
+        self.name = "bound method"
         return type(self)(self.declaration, env)
 
     def __repr__(self) -> str:
@@ -55,7 +57,7 @@ class ZSDFunction(ZSDCallable):
         if len(params) > 9:
             params = params[:9] + ["..."]
 
-        return f"<function {decl.name.lexeme}({", ".join(params)})>"
+        return f"<{self.name} {decl.name.lexeme}({", ".join(params)})>"
 
 class ZSDNativeFunction(ZSDCallable):
     def __init__(self, arity: int, name: str, callable: Callable[[Interpreter, list[object]], object]) -> None:
@@ -71,5 +73,3 @@ class ZSDNativeFunction(ZSDCallable):
     
     def __repr__(self) -> str:
         return f"<native {self.name}()>"
-    
-clock = ZSDNativeFunction(0, "clock", lambda i, a: time.perf_counter())

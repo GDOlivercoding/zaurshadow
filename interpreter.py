@@ -1,5 +1,6 @@
 from collections.abc import Sequence
-from callables import clock, ZSDCallable, ZSDFunction
+import typing
+from callables import ZSDCallable, ZSDFunction
 from classes import ZSDClass, ZSDInstance
 from environment import Environment
 from expr import (
@@ -11,6 +12,7 @@ from expr import (
     LiteralValue,
     Logical,
     Set,
+    Super,
     This,
     Unary,
     Variable,
@@ -30,7 +32,6 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
     def __init__(self) -> None:
         self.globals = Environment()
         self.env = self.globals
-        self.globals.define("clock", clock)
         self.locals: dict[Expr, int] = {}
 
     def interpret(self, statements: Sequence[stmt.Stmt]):
@@ -115,14 +116,29 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         raise ReturnException(stmt, self.evaluate(stmt.value))
     
     def visit_class_stmt(self, stmt: stmt.Class) -> None:
+        superclass = None
+        if stmt.superclass:
+            superclass = self.evaluate(stmt.superclass)
+            if not isinstance(superclass, ZSDClass):
+                raise ZSDRuntimeError(stmt.superclass.name, "Invalid superclass.")
+
         self.env.define(stmt.name.lexeme, None)
+
+        if stmt.superclass:
+            self.env = Environment(self.env)
+            self.env.define("super", superclass)
 
         methods: dict[str, ZSDFunction] = {}
         for method in stmt.methods:
             function = ZSDFunction(method, self.env, method.name.lexeme == "init")
             methods[method.name.lexeme] = function
 
-        klass = ZSDClass(stmt.name.lexeme, methods)
+        klass = ZSDClass(stmt.name.lexeme, methods, superclass)
+
+        if stmt.superclass:
+            assert isinstance(self.env.parent_scope, Environment)
+            self.env = self.env.parent_scope
+
         self.env.assign(stmt.name, klass)
 
     # region visit exprs
@@ -142,7 +158,9 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         
         distance = self.locals.get(expr, None)
         if distance is not None:
-            self.env.assign(expr.name, value, distance)
+            self.env.assign_at(expr.name.lexeme, value, distance)
+        else:
+            self.globals.assign(expr.name, value)
 
         return value
 
@@ -248,3 +266,14 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
     
     def visit_this_expr(self, expr: This) -> object:    
         return self.lookup_variable(expr.keyword, expr)
+    
+    def visit_super_expr(self, expr: Super) -> object:
+        distance = self.locals[expr]
+        superclass = typing.cast(ZSDClass, self.env.get_at("super", distance))
+        lifesaver = typing.cast(ZSDInstance, self.env.get_at("this", distance - 1))
+
+        tboy = superclass.find_method(expr.method.lexeme)
+        if tboy is None:
+            raise ZSDRuntimeError(expr.method, f"Undefined property {expr.method.lexeme!r}.")
+
+        return tboy.bind(lifesaver)

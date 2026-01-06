@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Protocol
-from expr import Expr
+from expr import Expr, Variable
 from zsdtoken import Token
 
 class Visitor[T](Protocol):
@@ -64,15 +64,16 @@ class Block(Stmt):
         return f"<Block statements={self.statements}>"
 
 class Class(Stmt):
-    def __init__(self, name: Token, methods: list[Function]):
+    def __init__(self, name: Token, methods: list[Function], superclass: Variable | None = None):
         self.name = name
         self.methods = methods
+        self.superclass = superclass
 
     def accept[T](self, visitor: Visitor[T]) -> T:
         return visitor.visit_class_stmt(self)
 
     def __repr__(self) -> str:
-        return f"<Class name={self.name} methods={self.methods}>"
+        return f"<Class name={self.name} methods={self.methods} superclass={self.superclass}>"
 
 class Print(Stmt):
     def __init__(self, expression: Expr):

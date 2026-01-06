@@ -39,10 +39,7 @@ class Environment:
         return env
 
     # a = ...;
-    def assign(self, name: Token, value: object, distance: int | None = None):
-        if distance is not None:
-            self.ancestor(distance).values[name.lexeme] = value
-
+    def assign(self, name: Token, value: object):
         if name.lexeme in self.values:
             self.values[name.lexeme] = value
             return
@@ -52,5 +49,8 @@ class Environment:
         
         raise ZSDRuntimeError(name, f"Undefined variable {name.lexeme!r}.")
     
+    def assign_at(self, name: str, value: object, distance: int):
+        self.ancestor(distance).values[name] = value
+
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} parent={self.parent_scope} values={self.values}>"

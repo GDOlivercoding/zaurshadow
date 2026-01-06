@@ -7,15 +7,16 @@ from interpreter import Interpreter
 from zsdtoken import Token
 import output
 
-class Scope(Enum):
+class FuncType(Enum):
     none = auto()
     function = auto()
     method = auto()
     initializer = auto()
 
-class Class(Enum):
+class ClassType(Enum):
     none = auto()
     klass = auto()
+    subclass = auto()
 
 class ScopeEntry:
     def __init__(self, token: Token | None = None, ready=False, used=False) -> None:
@@ -29,8 +30,8 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
         self.interpreter = interpreter
         # [{varname: str, meta: {ready: bool, used: bool}}]
         self.scopes: list[dict[str, ScopeEntry]] = []
-        self.current_scope: Scope = Scope.none
-        self.current_class: Class = Class.none
+        self.current_func: FuncType = FuncType.none
+        self.current_class: ClassType = ClassType.none
 
     # region stmt visits
 
@@ -49,7 +50,7 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
         self.declare(stmt.name)
         self.define(stmt.name)
 
-        self.resolve_function(stmt, Scope.function)
+        self.resolve_function(stmt, FuncType.function)
 
     def visit_expression_stmt(self, stmt: stmt.Expression) -> None:
         self.resolve(stmt.expression)
@@ -63,11 +64,11 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
             self.resolve(stmt.else_branch)
 
     def visit_return_stmt(self, stmt: stmt.Return) -> None:
-        if self.current_scope == Scope.none:
+        if self.current_func == FuncType.none:
             output.error(stmt.keyword, "Return outside function.")
 
         if stmt.value:
-            if self.current_scope == Scope.initializer:
+            if self.current_func == FuncType.initializer:
                 output.error(stmt.keyword, "Returning a value from an initializer is forbidden.")
 
             self.resolve(stmt.value)
@@ -81,19 +82,31 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
 
     def visit_class_stmt(self, stmt: stmt.Class) -> None:
         enclosing_class = self.current_class
-        self.current_class = Class.klass
+        self.current_class = ClassType.klass
 
         self.declare(stmt.name)
         self.define(stmt.name)
 
+        if stmt.superclass:
+            if stmt.superclass.name.lexeme == stmt.name.lexeme:
+                output.error(stmt.superclass.name, "A class cannot inherit from an identifier of its name.")
+
+            self.current_class = ClassType.subclass
+            self.resolve(stmt.superclass)
+            self.new_scope()
+            self.scopes[-1]["super"] = ScopeEntry(None, True, True)
+
         self.new_scope()
-        self.scopes[-1]["this"] = ScopeEntry()
+        self.scopes[-1]["this"] = ScopeEntry(None, True, True)
 
         for method in stmt.methods:
             self.resolve_function(
                 method, 
-                Scope.initializer if method.name.lexeme == "init" else Scope.method
+                FuncType.initializer if method.name.lexeme == "init" else FuncType.method
             )
+
+        if stmt.superclass:
+            self.pop_scope()
 
         self.pop_scope()
         self.current_class = enclosing_class
@@ -141,8 +154,14 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
         self.resolve(expr.object)
 
     def visit_this_expr(self, expr: expr.This) -> None:
-        if self.current_class == Class.none:
+        if self.current_class == ClassType.none:
             output.error(expr.keyword, "'this' outside class.")
+
+        self.resolve_local(expr, expr.keyword)
+
+    def visit_super_expr(self, expr: expr.Super) -> None:
+        if self.current_class != ClassType.subclass:
+            output.error(expr.keyword, "'super' outside subclass.")
 
         self.resolve_local(expr, expr.keyword)
 
@@ -163,9 +182,9 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
                 self.interpreter.resolve(expr, len(self.scopes) - 1 - i)
                 return
             
-    def resolve_function(self, func: stmt.Function, scope_type: Scope):
-        enclosing_scope = self.current_scope
-        self.current_scope = scope_type
+    def resolve_function(self, func: stmt.Function, scope_type: FuncType):
+        enclosing_scope = self.current_func
+        self.current_func = scope_type
         self.new_scope()
 
         for param in func.params:
@@ -174,7 +193,7 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
 
         self.resolve(func.body)
         self.pop_scope()
-        self.current_scope = enclosing_scope
+        self.current_func = enclosing_scope
 
     def new_scope(self):
         self.scopes.append({})
@@ -182,8 +201,9 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
     def pop_scope(self):
         scope = self.scopes.pop()
         for entry in scope.values():
-            if not entry.used and entry.token:
+            if not entry.used and entry.token and not entry.token.lexeme.startswith("_"):
                 output.error(entry.token, f"Local variable unused.")
+                output.error(entry.token, f"help: If this was intentional, prefix it with an underscore.")
 
     def declare(self, name: Token):
         if not self.scopes: return

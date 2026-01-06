@@ -13,6 +13,7 @@ def main():
         "Call": [("callee", "Expr"), ("paren", "Token"), ("arguments", "list[Expr]")],
         "Get": [("object", "Expr"), ("name", "Token")],
         "Set": [("object", "Expr"), ("name", "Token"), ("value", "Expr")],
+        "Super": [("keyword", "Token"), ("method", "Token")],
         "This": [("keyword", "Token")],
         "Grouping": [("expression", "Expr")],
         "Logical": [("left", "Expr"), ("operator", "Token"), ("right", "Expr")],
@@ -26,7 +27,7 @@ def main():
         "Function": [("name", "Token"), ("params", "list[Token]"), ("body", "list[Stmt]")],
         "If": [("conditions", "list[tuple[Expr, Stmt]]"), ("else_branch", "Stmt | None = None")],
         "Block": [("statements", "list[Stmt]")],
-        "Class": [("name", "Token"), ("methods", "list[Function]")],
+        "Class": [("name", "Token"), ("methods", "list[Function]"), ("superclass", "Variable | None = None")],
         "Print": [("expression", "Expr")],
         "Return": [("keyword", "Token"), ("value", "Expr")],
         "Var": [("name", "Token"), ("initializer", "Expr")],
@@ -44,7 +45,7 @@ def define_ast(output_dir: Path, baseclass: str, types: dict[str, list[tuple[str
     write("from typing import Protocol")
 
     if baseclass == "Stmt":
-        write("""from expr import Expr
+        write("""from expr import Expr, Variable
 from zsdtoken import Token""")
     elif baseclass == "Expr":
         write("""from zsdtoken import Token""")
