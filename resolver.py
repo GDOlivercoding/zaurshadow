@@ -1,6 +1,6 @@
 from enum import Enum, auto
 import expr
-from expr import Expr
+from expr import Expr, LiteralValue
 import stmt
 from stmt import Stmt
 from interpreter import Interpreter
@@ -131,6 +131,9 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
         self.resolve(expr.right)
 
     def visit_call_expr(self, expr: expr.Call) -> None:
+        if isinstance(expr.callee, LiteralValue):
+            output.error(expr.paren, f"Literal expression is not callable.")
+
         self.resolve(expr.callee)
 
         for arg in expr.arguments:
@@ -188,8 +191,8 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
         self.new_scope()
 
         for param in func.params:
-            self.declare(param)
-            self.define(param)
+            self.declare(param.name)
+            self.define(param.name)
 
         self.resolve(func.body)
         self.pop_scope()

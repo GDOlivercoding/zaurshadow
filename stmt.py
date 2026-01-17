@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Protocol
 from expr import Expr, Variable
 from zsdtoken import Token
@@ -30,8 +31,13 @@ class Expression(Stmt):
     def __repr__(self) -> str:
         return f"<Expression expression={self.expression}>"
 
+@dataclass
+class Param:
+    name: Token
+    default: Expr | None
+
 class Function(Stmt):
-    def __init__(self, name: Token, params: list[Token], body: list[Stmt]):
+    def __init__(self, name: Token, params: list[Param], body: list[Stmt]):
         self.name = name
         self.params = params
         self.body = body

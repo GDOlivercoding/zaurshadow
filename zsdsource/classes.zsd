@@ -23,3 +23,6 @@ class SillyPerson < Person {
 var boykisser = SillyPerson("boykisser");
 boykisser.greet();
 print boykisser.__class__;
+
+class Base {}
+class Sub < Base { getSuperClass() { this.__class__(); }}

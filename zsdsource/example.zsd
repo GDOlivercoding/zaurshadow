@@ -40,7 +40,7 @@ print hello;
 
 var printFunc = print;
 
-class Sub inherits Base {
+class Sub < Base {
     constructor() {
         super.init();
         this.name = "meow";

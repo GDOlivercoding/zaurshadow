@@ -3,7 +3,6 @@ import sys
 import time
 
 from callables import ZSDNativeFunction
-from classes import ZSDFunction, ZSDInstance
 from scanner import Scanner
 from zsdparser import Parser
 from resolver import Resolver
@@ -14,7 +13,7 @@ from stmt import Expression
 from zsdtoken import Token
 from tokentype import TokenType as tt
 
-clock = ZSDNativeFunction(0, "clock", lambda i, a: time.perf_counter())
+clock = ZSDNativeFunction((0, 0), "clock", lambda i, a: time.perf_counter())
 
 interpreter = Interpreter()
 interpreter.env.define("clock", clock)

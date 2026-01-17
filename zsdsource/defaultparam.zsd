@@ -1,0 +1,28 @@
+declare funcNoParam() {
+    print "normalFuncNoParam";
+}
+
+declare funcWithParams(name, count) {
+    for (;count > 0; count = count - 1) {
+        print "Hello " + name + "!";
+    }
+}
+
+declare funcSingleDefault(a, b = 0) {
+    return a - b;
+}
+
+// SyntaxError
+// declare nonDefaultAfterDefault(a = 0, b) {}
+
+declare funcAllDefaults(name = "Joshua", count = 1, amplify = 1) {
+    var suffix = "!" * amplify;
+    var body = "Hello " + name + suffix;
+
+    for (;count > 0; count = count - 1) {
+        print body;
+    }
+}
+
+funcAllDefaults();
+funcAllDefaults("Anjulie", 1, 3);

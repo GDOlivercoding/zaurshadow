@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 import typing
-from callables import ZSDCallable, ZSDFunction
-from classes import ZSDClass, ZSDInstance
+from callables import ZSDCallable, ZSDFunction, ZSDParam
+from classes import ZSDClass, ZSDObject
 from environment import Environment
 from expr import (
     Assign,
@@ -109,7 +109,8 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         self.env.define(stmt.name.lexeme, value)
 
     def visit_function_stmt(self, stmt: stmt.Function) -> None:
-        function = ZSDFunction(stmt, self.env)
+        parameters = [ZSDParam(param.name, param.default and self.evaluate(param.default)) for param in stmt.params]
+        function = ZSDFunction(stmt, parameters, self.env)
         self.env.define(stmt.name.lexeme, function)
 
     def visit_return_stmt(self, stmt: stmt.Return):
@@ -130,7 +131,8 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
 
         methods: dict[str, ZSDFunction] = {}
         for method in stmt.methods:
-            function = ZSDFunction(method, self.env, method.name.lexeme == "init")
+            parameters = [ZSDParam(param.name, param.default and self.evaluate(param.default)) for param in method.params]
+            function = ZSDFunction(method, parameters, self.env, method.name.lexeme == "init")
             methods[method.name.lexeme] = function
 
         klass = ZSDClass(stmt.name.lexeme, methods, superclass)
@@ -237,11 +239,30 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         callee = self.evaluate(expr.callee)
         arguments = [self.evaluate(arg) for arg in expr.arguments]
 
+        if not isinstance(callee, ZSDCallable):
+            assert isinstance(callee, ZSDObject)
+            raise ZSDRuntimeError(
+                expr.paren,
+                f"{callee.klass.name!r} object is not callable."
+            )
+
         function = cast(ZSDCallable, callee)
-        if (arg_len := len(arguments)) != (arity := function.arity()):
+
+        arg_len = len(arguments)
+        min_arity, max_arity = function.arity()
+
+        s = lambda i: "" if i == 1 else "s"
+
+        if arg_len < min_arity:
             raise ZSDRuntimeError(
                 expr.paren, 
-                f"Expected {arity} arguments but received {arg_len} instead."
+                f"Expected at least {min_arity} argument{s(min_arity)} but received {arg_len} instead."
+            )
+        
+        if arg_len > max_arity:
+            raise ZSDRuntimeError(
+                expr.paren, 
+                f"Expected at most {max_arity} argument{s(max_arity)} but received {arg_len} instead."
             )
 
         return function.call(self, arguments)
@@ -249,7 +270,7 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
     def visit_get_expr(self, expr: Get) -> object:
         object = self.evaluate(expr.object)
 
-        if isinstance(object, ZSDInstance):
+        if isinstance(object, ZSDObject):
             return object.get(expr.name)
         
         raise ZSDRuntimeError(expr.name, "Invalid attribute accessor.")
@@ -257,7 +278,7 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
     def visit_set_expr(self, expr: Set) -> object:
         object = self.evaluate(expr.object)
 
-        if not isinstance(object, ZSDInstance):
+        if not isinstance(object, ZSDObject):
             raise ZSDRuntimeError(expr.name, "Invalid setter.")
         
         value = self.evaluate(expr.value)
@@ -270,7 +291,7 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
     def visit_super_expr(self, expr: Super) -> object:
         distance = self.locals[expr]
         superclass = typing.cast(ZSDClass, self.env.get_at("super", distance))
-        lifesaver = typing.cast(ZSDInstance, self.env.get_at("this", distance - 1))
+        lifesaver = typing.cast(ZSDObject, self.env.get_at("this", distance - 1))
 
         tboy = superclass.find_method(expr.method.lexeme)
         if tboy is None:

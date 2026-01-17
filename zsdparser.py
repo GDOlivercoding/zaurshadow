@@ -14,7 +14,7 @@ from expr import (
     Variable
 )
 from output import ParseError
-from stmt import Stmt
+from stmt import Param, Stmt
 from zsdtoken import Token
 
 import output
@@ -179,14 +179,32 @@ class Parser:
         name = self.consume(tt.IDENTIFIER, f"Expect {fn_type} name.")
         self.consume(tt.LEFT_PAREN, f"Expect '(' after {fn_type} name.")
 
-        parameters: list[Token] = []
-        if not self.check(tt.RIGHT_PAREN) and not self.is_at_end():
-            parameters.append(self.consume(tt.IDENTIFIER, "Expect parameter name."))
+        had_default = False
+        parameters: list[Param] = []
 
-        while self.match(tt.COMMA):
+        def param():
+            nonlocal had_default
+
             if len(parameters) > 255:
                 self.error(self.peek(), f"Maximum arguments passed to a function exceeded.")
-            parameters.append(self.consume(tt.IDENTIFIER, "Expect parameter name."))
+
+            name = self.consume(tt.IDENTIFIER, "Expect parameter name.")
+            if self.match(tt.EQUAL):
+                default = self.logical_or()
+                had_default = True
+            else:
+                if had_default:
+                    output.error(name, "Cannot follow default parameter with a non default one.")
+                default = None
+
+            parameters.append(Param(name, default))
+            
+
+        if not self.check(tt.RIGHT_PAREN) and not self.is_at_end():
+            param()
+
+        while self.match(tt.COMMA):
+            param()
 
         self.consume(tt.RIGHT_PAREN, f"Expect ')' after parameter field.")
         self.consume(tt.LEFT_BRACE, "Expect '{' after %s declaration" % fn_type)
@@ -230,7 +248,7 @@ class Parser:
 
         if self.match(tt.EQUAL):
             equals = self.previous()
-            value = self.assignment()
+            value = self.logical_or()
 
             if isinstance(expr, Variable):
                 return Assign(expr.name, value)
@@ -301,12 +319,6 @@ class Parser:
     
     def call(self):
         expr = self.primary()
-
-        if self.check(tt.LEFT_PAREN) and isinstance(expr, LiteralValue):
-            self.error(
-                previous := self.tokens[self.current - 2], 
-                f"Expression of type {previous.type.name.lower()!r} is not callable."
-            )
 
         while True:
             if self.match(tt.LEFT_PAREN):
