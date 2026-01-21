@@ -12,11 +12,19 @@ import output
 from stmt import Expression
 from zsdtoken import Token
 from tokentype import TokenType as tt
+from classes import range_class
 
-clock = ZSDNativeFunction((0, 0), "clock", lambda i, a: time.perf_counter())
+clock = ZSDNativeFunction((0, 0), "clock", lambda _, args: time.perf_counter())
+
+def to_string_callback(_, args: list[object]):
+    return str(args[0]) if args else ""
+
+to_string = ZSDNativeFunction((0, 1), "str", to_string_callback)
 
 interpreter = Interpreter()
 interpreter.env.define("clock", clock)
+interpreter.env.define("str", to_string)
+interpreter.env.define("range", range_class)
 
 def main():
     if len(sys.argv) > 2:

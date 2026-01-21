@@ -37,14 +37,16 @@ class Scanner:
         match char:
             case ")": add_token(tt.RIGHT_PAREN)
             case "(": add_token(tt.LEFT_PAREN)
-            case "{": add_token(tt.LEFT_BRACE)
             case "}": add_token(tt.RIGHT_BRACE)
+            case "{": add_token(tt.LEFT_BRACE)
+
             case ",": add_token(tt.COMMA)
             case ".": add_token(tt.DOT) if not intable(self.peek()) else self.parse_number()
-            case "-": add_token(tt.MINUS)
-            case "+": add_token(tt.PLUS)
             case ";": add_token(tt.SEMICOLON)
-            case "*": add_token(tt.STAR)
+
+            case "-": add_token(tt.MINUS if not self.match("=") else tt.MINUS_EQUAL)
+            case "+": add_token(tt.PLUS if not self.match("=") else tt.PLUS_EQUAL)
+            case "*": add_token(tt.STAR if not self.match("=") else tt.STAR_EQUAL)
 
             case "!":
                 add_token(tt.BANG_EQUAL if self.match("=") else tt.BANG)
@@ -78,6 +80,9 @@ class Scanner:
 
                         self.advance()
 
+                elif self.match("="):
+                    add_token(tt.SLASH_EQUAL)
+
                 else:
                     add_token(tt.SLASH)
 
@@ -97,7 +102,6 @@ class Scanner:
     def parse_string(self):
         while (
             self.peek() != '"' 
-            #and self.source[self.current-1] != "\\" 
             and not self.is_at_end()
         ):
             if self.peek() == "\n":
@@ -128,12 +132,13 @@ class Scanner:
             elif self.peek_next() == ".":
                 start = int(self.source[self.start:self.current])
                 self.advance()
+                self.advance()
                 inclusive = self.match("=")
 
                 end_line = self.current
                 while intable(self.peek()): self.advance()
                 stop = int(self.source[end_line:self.current])
-                self.add_token(tt.RANGE, range(start, stop + inclusive))
+                return self.add_token(tt.RANGE, (start, stop + inclusive, 1))
 
         init_choice = dot and float or int
         #print(f"parse_float(): {self.start=} {self.current=}")
@@ -148,7 +153,7 @@ class Scanner:
 
     def match(self, expected_char: str):
         if self.is_at_end(): return False
-        if (self.source[self.current] != expected_char): return False
+        if self.source[self.current] != expected_char: return False
 
         self.current += 1
         return True

@@ -1,0 +1,33 @@
+class Struct {
+    init() {
+        this.a = 1;
+        this.b = 1;
+        this.c = 1;
+        this.d = 1;
+        this.e = 1;
+        this.f = 1;
+        this.g = 1;
+        this.h = 1;
+    }
+}
+
+var start = clock();
+var sum = 0;
+
+for (var i = 0; i < 100000; i = i + 1) {
+    var struct = Struct();
+    sum =
+        sum 
+        + struct.a
+        + struct.b
+        + struct.c
+        + struct.d
+        + struct.e
+        + struct.f
+        + struct.g
+        + struct.h;
+}
+
+var end = clock() - start;
+print "Total time: " + end;
+print "Total sum: " + sum;

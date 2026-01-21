@@ -1,0 +1,13 @@
+// concept file
+
+var a = 4;
+var b = 6;
+
+// "Expected at most {a} arguments but received {b} instead."
+// same as:
+"Expected at most"+a+" arguments but received "+b+" instead."
+
+var food = "tortilla";
+
+// "Todays menu: " + "Today the main meal is {food}!"
+// "Todays menu: " + "Today the main meal is "+str(food)+"!"

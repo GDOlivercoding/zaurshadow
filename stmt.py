@@ -15,6 +15,7 @@ class Visitor[T](Protocol):
     def visit_return_stmt(self, stmt: Return) -> T: ...
     def visit_var_stmt(self, stmt: Var) -> T: ...
     def visit_while_stmt(self, stmt: While) -> T: ...
+    def visit_for_stmt(self, stmt: For) -> T: ...
 
 class Stmt(ABC): 
     @abstractmethod
@@ -123,3 +124,16 @@ class While(Stmt):
 
     def __repr__(self) -> str:
         return f"<While condition={self.condition} body={self.body}>"
+
+class For(Stmt):
+    def __init__(self, keyword: Token, initializer: Token, iterable: Expr, body: Stmt) -> None:
+        self.keyword = keyword
+        self.iter_var = initializer
+        self.iterable = iterable
+        self.body = body
+
+    def accept[T](self, visitor: Visitor[T]) -> T:
+        return visitor.visit_for_stmt(self)
+    
+    def __repr__(self) -> str:
+        return f"<For kw={self.keyword} initializer={self.iter_var} iterator={self.iterable} body={self.body}>"

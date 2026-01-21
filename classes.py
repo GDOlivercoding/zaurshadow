@@ -1,8 +1,10 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from functools import partial
+from typing import TYPE_CHECKING, Any
 from callables import ZSDCallable, ZSDFunction, ZSDNativeFunction
 from output import ZSDRuntimeError
 from zsdtoken import Token
+from literals import nil
 
 if TYPE_CHECKING:
     from interpreter import Interpreter
@@ -10,7 +12,7 @@ if TYPE_CHECKING:
 class ZSDObject:
     def __init__(self, klass: ZSDClass) -> None:
         self.klass = klass
-        self.fields: dict[str, object] = {
+        self.fields: dict[str, Any] = {
             # the class that this instance is of
             "__class__": self.klass,
             "init": self.klass.find_method("init")
@@ -65,6 +67,83 @@ class ZSDClass(ZSDCallable, ZSDObject):
     def __repr__(self) -> str:
         return f"<class {self.name}>"
     
-class ZSDInt(ZSDClass):
-    def __init__(self, name: str, methods: dict[str, ZSDFunction], superclass: ZSDClass | None = None) -> None:
-        super().__init__(name, methods, superclass)
+class ZSDNativeClass(ZSDClass):
+    def __init__(
+        self, 
+        name: str, 
+        init: ZSDNativeFunction, 
+        methods: dict[str, ZSDNativeFunction], 
+        superclass: ZSDClass | None = None
+    ) -> None:
+        self.name = name
+        self.init = init
+        self.methods = methods | {init.name: init}
+        self.superclass = superclass
+
+    def arity(self):
+        return self.init.arity()
+    
+    def find_method(self, name: str): # type: ignore
+        method = self.methods.get(name)
+        if method:
+            return method
+        
+        return self.superclass and self.superclass.find_method(name)
+
+    def call(self, interpreter: Interpreter, arguments: list[object]) -> object:
+        return self.init.call(interpreter, [ZSDObject(self)] + arguments)
+    
+    def __repr__(self) -> str:
+        return f"<native class {self.name}>"
+
+# region native code
+
+def range_init(inter: Interpreter, arguments: list[Any]):
+    self: ZSDObject = arguments.pop(0)
+
+    start = stop = 0
+    step = 1
+
+    match len(arguments):
+        case 1:
+            stop, = arguments
+        case 2:
+            start, stop = arguments
+        case 3:
+            start, stop, step = arguments
+
+    self.fields["start"] = start
+    self.fields["stop"] = stop
+    self.fields["step"] = step
+    self.fields["index"] = 0
+    return self
+
+def range_iter(inter: Interpreter, arguments: list[Any]):
+    return arguments[0]
+
+def range_next(inter: Interpreter, arguments: list[Any]):
+    self: ZSDObject = arguments.pop(0)
+
+    start: int = self.fields["start"]
+    stop: int = self.fields["stop"]
+    step: int = self.fields["step"]
+    index: int = self.fields["index"]
+
+    next_value = start + (index * step)
+    if next_value >= stop:
+        self.fields["index"] = 0
+        return nil
+    
+    self.fields["index"] = index + 1
+    return next_value
+
+methods = {
+    "iter": ZSDNativeFunction((0, 0), "iter", range_iter),
+    "next": ZSDNativeFunction((0, 0), "next", range_next)
+}
+
+range_class = ZSDNativeClass(
+    "range", 
+    ZSDNativeFunction((1, 3), "init", range_init),
+    methods
+)

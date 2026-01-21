@@ -1,0 +1,6 @@
+var count = 2;
+
+do {
+    print "meow";
+    count -= 1;
+} while count >= 0;

@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 import typing
 from callables import ZSDCallable, ZSDFunction, ZSDParam
-from classes import ZSDClass, ZSDObject
+from classes import ZSDClass, ZSDObject, range_class
 from environment import Environment
 from expr import (
     Assign,
@@ -11,6 +11,7 @@ from expr import (
     Grouping,
     LiteralValue,
     Logical,
+    Range,
     Set,
     Super,
     This,
@@ -143,6 +144,28 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
 
         self.env.assign(stmt.name, klass)
 
+    def visit_for_stmt(self, stmt: stmt.For) -> None:
+        iterable = self.evaluate(stmt.iterable)
+        assert getattr(iterable, "fields", None) is not None
+        assert isinstance(iterable, ZSDObject)
+
+        next_func = iterable.klass.find_method("iter")
+        if next_func is None:
+            raise ZSDRuntimeError(stmt.keyword, f"{iterable.klass.name} object is not iterable.")
+        
+        iterator = next_func.bind(iterable).call(self, [])
+        assert isinstance(iterator, ZSDObject)
+
+        next_func = iterator.klass.find_method("next")
+        if next_func is None:
+            raise ZSDRuntimeError(stmt.keyword, f"{iterator.klass.name} object is not an iterator.")
+        
+        self.env.define(stmt.iter_var.lexeme, nil)
+
+        while (next_value := next_func.bind(iterator).call(self, [])) is not nil:
+            self.env.assign(stmt.iter_var, next_value)
+            self.execute(stmt.body)
+
     # region visit exprs
 
     def visit_variable_expr(self, expr: Variable) -> object:
@@ -191,14 +214,13 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         shadowize = self.shadowize
 
         match expr.operator.type:
-            case tt.MINUS:
+            case tt.MINUS | tt.MINUS_EQUAL:
                 return shadowize(left - right)
-            case tt.STAR:
+            case tt.STAR | tt.STAR_EQUAL:
                 return shadowize(left * right)
-            case tt.SLASH:
+            case tt.SLASH | tt.SLASH_EQUAL:
                 return shadowize(left / right)
-            case tt.PLUS:
-                #print("plus", type(left) is type(right))
+            case tt.PLUS | tt.PLUS_EQUAL:
                 if isinstance(left, str) or isinstance(right, str):
                     return str(left) + str(right)
                 if isinstance(left, (float, int)) and isinstance(right, (float, int)):
@@ -298,3 +320,6 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
             raise ZSDRuntimeError(expr.method, f"Undefined property {expr.method.lexeme!r}.")
 
         return tboy.bind(lifesaver)
+    
+    def visit_range_expr(self, expr: Range) -> object:
+        return range_class.call(self, [expr.start, expr.stop, expr.step])

@@ -1,0 +1,12 @@
+var a = 4;
+declare returnFunc() {
+    declare returner() {
+        return a;
+    }
+    var a = 2;
+    print a;
+
+    return returner;
+}
+
+print returnFunc()();

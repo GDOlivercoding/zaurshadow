@@ -3,15 +3,23 @@ from enum import Enum, auto
 class TokenType(Enum):
     LEFT_PAREN = auto()
     RIGHT_PAREN = auto()
+
     LEFT_BRACE = auto()
     RIGHT_BRACE = auto()
+
     COMMA = auto()
     DOT = auto()
-    MINUS = auto()
-    PLUS = auto()
     SEMICOLON = auto()
+
+    MINUS = auto()
+    MINUS_EQUAL = auto()
+    PLUS = auto()
+    PLUS_EQUAL = auto()
     SLASH = auto()
+    SLASH_EQUAL = auto()
     STAR = auto()
+    STAR_EQUAL = auto()
+
     BANG = auto()
     BANG_EQUAL = auto()
     EQUAL = auto()
@@ -20,30 +28,38 @@ class TokenType(Enum):
     GREATER_EQUAL = auto()
     LESS = auto()
     LESS_EQUAL = auto()
+
     IDENTIFIER = auto()
     STRING = auto()
     NUMBER = auto()
     RANGE = auto()
-    EOF = auto()
+
+    PRINT = auto()
+    VAR = auto()
     AND = auto()
-    CLASS = auto()
-    ELSE = auto()
-    THIS = auto()
-    FALSE = auto()
-    DECLARE = auto()
-    FOR = auto()
+    OR = auto()
+
     IF = auto()
     ELSEIF = auto()
-    NIL = auto()
-    OR = auto()
-    PRINT = auto()
+    ELSE = auto()
+
+    DECLARE = auto()
     RETURN = auto()
-    SUPER = auto()
+
+    NIL = auto()
     TRUE = auto()
-    VAR = auto()
-    WHILE = auto()
+    FALSE = auto()
+
+    CLASS = auto()
+    THIS = auto()
+    SUPER = auto()
+
+    FOR = auto()
+    OF = auto()
     DO = auto()
-    INHERITS = auto()
+    WHILE = auto()
+
+    EOF = auto()
 
 keywords: dict[str, TokenType] = {
     "and": TokenType.AND,
@@ -64,5 +80,5 @@ keywords: dict[str, TokenType] = {
     "var": TokenType.VAR,
     "while": TokenType.WHILE,
     "do": TokenType.DO,
-    "inherits": TokenType.INHERITS
+    "of": TokenType.OF
 }

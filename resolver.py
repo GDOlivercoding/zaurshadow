@@ -1,6 +1,6 @@
 from enum import Enum, auto
 import expr
-from expr import Expr, LiteralValue
+from expr import Expr, LiteralValue, Variable
 import stmt
 from stmt import Stmt
 from interpreter import Interpreter
@@ -111,6 +111,11 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
         self.pop_scope()
         self.current_class = enclosing_class
 
+    def visit_for_stmt(self, stmt: stmt.For) -> None:
+        self.resolve_local(Variable(stmt.iter_var), stmt.iter_var)
+        self.resolve(stmt.iterable)
+        self.resolve(stmt.body)
+
     # region expr visits
 
     def visit_variable_expr(self, expr: expr.Variable) -> None:
@@ -131,9 +136,6 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
         self.resolve(expr.right)
 
     def visit_call_expr(self, expr: expr.Call) -> None:
-        if isinstance(expr.callee, LiteralValue):
-            output.error(expr.paren, f"Literal expression is not callable.")
-
         self.resolve(expr.callee)
 
         for arg in expr.arguments:
@@ -167,6 +169,9 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
             output.error(expr.keyword, "'super' outside subclass.")
 
         self.resolve_local(expr, expr.keyword)
+
+    def visit_range_expr(self, expr: expr.Range) -> None:
+        pass
 
     # region utilities
 

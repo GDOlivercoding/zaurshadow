@@ -1,3 +1,4 @@
+import typing
 from expr import (
     Assign,
     Binary,
@@ -7,6 +8,7 @@ from expr import (
     Grouping,
     LiteralValue,
     Logical,
+    Range,
     Set,
     Super,
     This,
@@ -51,7 +53,7 @@ class Parser:
         if self.match(tt.EQUAL):
             init = self.expression()
         else: 
-            init = LiteralValue(None)
+            init = LiteralValue(nil)
 
         self.consume(tt.SEMICOLON, "Expect ';' after variable declaration.")
         return stmt.Var(name, init)
@@ -77,6 +79,8 @@ class Parser:
             return self.block()
         if self.match(tt.WHILE):
             return self.while_statement()
+        if self.match(tt.DO):
+            return self.dowhile()
         if self.match(tt.FOR):
             return self.for_statement()
         if self.match(tt.DECLARE):
@@ -130,6 +134,17 @@ class Parser:
         body = self.block()
 
         return stmt.While(condition, body)
+    
+    def dowhile(self):
+        self.consume(tt.LEFT_BRACE, "Expect '{' after do.")
+
+        body = self.block()
+        self.consume(tt.WHILE, "Expect 'while' after do-while body.")
+
+        condition = self.expression()
+        self.consume(tt.SEMICOLON, "Expect ';' after do-while condition.")
+
+        return stmt.Block([body, stmt.While(condition, body)])
 
     def print_statement(self):
         value = self.expression()
@@ -142,7 +157,19 @@ class Parser:
         return stmt.Expression(expr)
     
     def for_statement(self):
-        self.consume(tt.LEFT_PAREN, "Expect '(' after for.")
+        for_token = self.previous()
+        for_of = not self.match(tt.LEFT_PAREN)
+
+        if for_of:
+            iter_var = self.consume(tt.IDENTIFIER, "Expect '(' or identifier after 'for'.")
+            self.consume(tt.OF, f"Expect 'of' after 'for {iter_var}'")
+
+            iterable = self.expression()
+            self.consume(tt.LEFT_BRACE, "Expect '{' after for-of loop condition.")
+            body = self.block()
+        
+            # i cannot desugar this because the condition and increment are difficult
+            return stmt.For(for_token, iter_var, iterable, body)
 
         if self.match(tt.SEMICOLON):
             initializer = None
@@ -152,7 +179,7 @@ class Parser:
             initializer = self.expr_statement()
 
         if self.check(tt.SEMICOLON):
-            condition = LiteralValue(True)
+            condition = LiteralValue(true)
         else:
             condition = self.expression()
         self.consume(tt.SEMICOLON, "Expect ';' after loop condition")
@@ -177,36 +204,36 @@ class Parser:
     
     def function(self, fn_type: str):
         name = self.consume(tt.IDENTIFIER, f"Expect {fn_type} name.")
-        self.consume(tt.LEFT_PAREN, f"Expect '(' after {fn_type} name.")
-
-        had_default = False
+        
         parameters: list[Param] = []
+        if self.match(tt.LEFT_PAREN):
 
-        def param():
-            nonlocal had_default
+            def param():
+                had_default = False
 
-            if len(parameters) > 255:
-                self.error(self.peek(), f"Maximum arguments passed to a function exceeded.")
+                if len(parameters) > 255:
+                    self.error(self.peek(), f"Maximum arguments passed to a function exceeded.")
 
-            name = self.consume(tt.IDENTIFIER, "Expect parameter name.")
-            if self.match(tt.EQUAL):
-                default = self.logical_or()
-                had_default = True
-            else:
-                if had_default:
-                    output.error(name, "Cannot follow default parameter with a non default one.")
-                default = None
+                name = self.consume(tt.IDENTIFIER, "Expect parameter name.")
+                if self.match(tt.EQUAL):
+                    default = self.logical_or()
+                    had_default = True
+                else:
+                    if had_default:
+                        output.error(name, "Cannot follow default parameter with a non default one.")
+                    default = None
 
-            parameters.append(Param(name, default))
-            
+                parameters.append(Param(name, default))
+                
 
-        if not self.check(tt.RIGHT_PAREN) and not self.is_at_end():
-            param()
+            if not self.check(tt.RIGHT_PAREN) and not self.is_at_end():
+                param()
 
-        while self.match(tt.COMMA):
-            param()
+            while self.match(tt.COMMA):
+                param()
 
-        self.consume(tt.RIGHT_PAREN, f"Expect ')' after parameter field.")
+            self.consume(tt.RIGHT_PAREN, f"Expect ')' after parameter field.")
+
         self.consume(tt.LEFT_BRACE, "Expect '{' after %s declaration" % fn_type)
         body = self.block()
         return stmt.Function(name, parameters, body.statements)
@@ -240,20 +267,26 @@ class Parser:
     # region sinkhole 
 
     # lowest precedence is here
-    def expression(self):
+    def expression(self) -> Expr:
         return self.assignment()
 
     def assignment(self):
         expr = self.logical_or()
 
-        if self.match(tt.EQUAL):
+        if self.match(tt.EQUAL, tt.MINUS_EQUAL, tt.PLUS_EQUAL, tt.STAR_EQUAL, tt.SLASH_EQUAL):
             equals = self.previous()
             value = self.logical_or()
 
             if isinstance(expr, Variable):
-                return Assign(expr.name, value)
+                if equals.type == tt.EQUAL:
+                    return Assign(expr.name, value)
+                
+                return Assign(expr.name, Binary(expr, equals, value))
+            
             elif isinstance(expr, Get):
-                return Set(expr.object, expr.name, value)
+                if equals.type == tt.EQUAL:
+                    return Set(expr.object, expr.name, value)
+                return Set(expr.object, expr.name, Binary(expr, equals, value))
             
             raise self.error(equals, "Invalid assignment target.")
         
@@ -302,10 +335,29 @@ class Parser:
     def factor(self):
         expr = self.unary()
 
-        while self.match(tt.SLASH, tt.STAR):
+        while self.match(tt.SLASH, tt.STAR, tt.LEFT_PAREN):
             operator = self.previous()
-            right = self.unary()
-            expr = Binary(expr, operator, right)
+
+            if operator.type != tt.LEFT_PAREN:
+                right = self.unary()
+                expr = Binary(expr, operator, right)
+                continue
+
+            if isinstance(expr, LiteralValue) and isinstance(expr.value, int):
+                operator = self.previous()
+                right = Grouping(self.expression())
+                self.consume(tt.RIGHT_PAREN, "Expected ')' after expression.")
+
+                expr = Binary(
+                    expr, 
+                    Token(
+                        tt.STAR, 
+                        operator.lexeme,
+                        operator.literal,
+                        operator.line,
+                    ), 
+                    right
+                )
 
         return expr
     
@@ -321,8 +373,9 @@ class Parser:
         expr = self.primary()
 
         while True:
-            if self.match(tt.LEFT_PAREN):
+            if not isinstance(expr, LiteralValue) and self.match(tt.LEFT_PAREN):
                 expr = self.finish_call(expr)
+
             elif self.match(tt.DOT):
                 name = self.consume(tt.IDENTIFIER, "Expect identifier after attribute accessor.")
                 expr = Get(expr, name)
@@ -354,6 +407,10 @@ class Parser:
             self.consume(tt.DOT, "Expect attribute access after 'super'.")
             method = self.consume(tt.IDENTIFIER, "Expect identifier after attribute accessor.")
             return Super(keyword, method)
+        
+        if self.match(tt.RANGE):
+            rangeobj = typing.cast("tuple[int, int, int]", self.previous().literal)
+            return Range(*rangeobj)
         
         #if self.match(tt.DECLARE):
         #    return self.expression_function()

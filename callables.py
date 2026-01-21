@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from itertools import zip_longest
 from typing import TYPE_CHECKING
 from environment import Environment
-from output import ReturnException
+from output import ReturnException, ZSDRuntimeError
 import stmt
 from zsdtoken import Token
 from literals import nil
@@ -18,7 +18,8 @@ class ZSDCallable(ABC):
     @abstractmethod
     def call(self, interpreter: Interpreter, arguments: list[object]) -> object: ...
     @abstractmethod
-    def arity(self) -> tuple[int, int]: ...
+    def arity(self) -> tuple[int, int]: 
+        """Minimal and maximal arity in (min_args, max_args) form"""
 
 @dataclass
 class ZSDParam:
@@ -33,24 +34,22 @@ class ZSDFunction(ZSDCallable):
         self.is_init = is_init
         self.name = "function"
 
-    # TODO
     def arity(self):
         try:
             index = [p.default for p in self.parameters].index(None)
         except ValueError:
-            index = None
+            index = -1
 
         return (
-            0 if index is None else index + 1,
+            index + 1,
             len(self.parameters)
         )
 
-    # TODO: verify arguments in visit_call_expr() method
     def call(self, interpreter: Interpreter, arguments: list[object]) -> object:
         env = Environment(self.closure)
 
         # I assume here, that len(arguments) <= len(self.parameters)
-        # and that len(arguments) is equal or higher to the amount of required arguments
+        # and that len(arguments) >= required arguments
         for param, arg in zip_longest(self.parameters, arguments, fillvalue=None):
             assert param is not None # can never be None
 
@@ -65,6 +64,8 @@ class ZSDFunction(ZSDCallable):
             interpreter.execute_block(self.declaration.body, env)
         except ReturnException as exc:
             if self.is_init:
+                if exc.value is not nil:
+                    raise ZSDRuntimeError(exc.return_stmt.keyword, "Cannot return value from initializer.")
                 return self.closure.get_at("this", 0)
 
             return exc.value
@@ -90,15 +91,28 @@ class ZSDFunction(ZSDCallable):
         return f"<{self.name} {decl.name.lexeme}({", ".join(params)})>"
 
 class ZSDNativeFunction(ZSDCallable):
-    def __init__(self, arity: tuple[int, int], name: str, callable: Callable[[Interpreter, list[object]], object]) -> None:
+    def __init__(
+        self, 
+        arity: tuple[int, int], 
+        name: str, 
+        callable: Callable[[Interpreter, list[object]], object],
+        binding: "ZSDObject | None" = None
+    ) -> None:
         self._arity = arity
         self.name = name
         self.callable = callable
+        self.binding = binding
+
+    def bind(self, instance: "ZSDObject"):
+        return type(self)(self._arity, self.name, self.callable, instance)
 
     def arity(self):
         return self._arity
     
     def call(self, interpreter: Interpreter, arguments: list[object]) -> object:
+        if self.binding:
+            arguments = [self.binding] + arguments
+
         return self.callable(interpreter, arguments)
     
     def __repr__(self) -> str:

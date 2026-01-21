@@ -16,6 +16,7 @@ class Visitor[T](Protocol):
     def visit_literalvalue_expr(self, expr: LiteralValue) -> T: ...
     def visit_unary_expr(self, expr: Unary) -> T: ...
     def visit_variable_expr(self, expr: Variable) -> T: ...
+    def visit_range_expr(self, expr: Range) -> T: ...
 
 class Expr(ABC): 
     @abstractmethod
@@ -154,3 +155,15 @@ class Variable(Expr):
 
     def __repr__(self) -> str:
         return f"<Variable name={self.name}>"
+
+class Range(Expr):
+    def __init__(self, start: int, stop: int, step: int) -> None:
+        self.start = start
+        self.stop = stop
+        self.step = step
+
+    def accept[T](self, visitor: Visitor[T]) -> T:
+        return visitor.visit_range_expr(self)
+    
+    def __repr__(self) -> str:
+        return f"<Range start={self.start} stop={self.stop} step={self.step}>"
