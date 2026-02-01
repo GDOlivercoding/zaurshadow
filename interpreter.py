@@ -1,9 +1,10 @@
 from collections.abc import Sequence
 import typing
 from callables import ZSDCallable, ZSDFunction, ZSDParam
-from classes import ZSDClass, ZSDObject, range_class
+from classes import ZSDClass, ZSDObject
 from environment import Environment
 from expr import (
+    AnonObject,
     Assign,
     Binary,
     Call,
@@ -22,11 +23,12 @@ from expr import (
 )
 import stmt
 import output
-from literals import true, false, nil
+from literals import ZSDStopIteration, true, false, nil
 from output import ReturnException, ZSDRuntimeError
 from tokentype import TokenType as tt
 from zsdtoken import Token
-from typing import Any, cast
+from typing import Any
+from natives import ZSDAnonObject, range_class
 
 # region Interpreter
 class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
@@ -146,23 +148,26 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
 
     def visit_for_stmt(self, stmt: stmt.For) -> None:
         iterable = self.evaluate(stmt.iterable)
-        assert getattr(iterable, "fields", None) is not None
         assert isinstance(iterable, ZSDObject)
 
-        next_func = iterable.klass.find_method("iter")
-        if next_func is None:
-            raise ZSDRuntimeError(stmt.keyword, f"{iterable.klass.name} object is not iterable.")
-        
-        iterator = next_func.bind(iterable).call(self, [])
-        assert isinstance(iterator, ZSDObject)
+        iter_func = iterable.klass.find_method("iter")
+        if iter_func is None:
 
-        next_func = iterator.klass.find_method("next")
-        if next_func is None:
-            raise ZSDRuntimeError(stmt.keyword, f"{iterator.klass.name} object is not an iterator.")
+            next_func = iterable.klass.find_method("next")
+            if next_func is None:
+                raise ZSDRuntimeError(stmt.keyword, f"{iterable.klass.name!r} object is not iterable.")
+            iterator = iterable
+        else:
+            iterator = iter_func.bind(iterable).call(self, [])
+            assert isinstance(iterator, ZSDObject)
+
+            next_func = iterator.klass.find_method("next")
+            if next_func is None:
+                raise ZSDRuntimeError(stmt.keyword, f"{iterator.klass.name!r} object is not an iterator.")
         
         self.env.define(stmt.iter_var.lexeme, nil)
 
-        while (next_value := next_func.bind(iterator).call(self, [])) is not nil:
+        while (next_value := next_func.bind(iterator).call(self, [])) is not ZSDStopIteration:
             self.env.assign(stmt.iter_var, next_value)
             self.execute(stmt.body)
 
@@ -268,7 +273,7 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
                 f"{callee.klass.name!r} object is not callable."
             )
 
-        function = cast(ZSDCallable, callee)
+        function = callee
 
         arg_len = len(arguments)
         min_arity, max_arity = function.arity()
@@ -287,7 +292,12 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
                 f"Expected at most {max_arity} argument{s(max_arity)} but received {arg_len} instead."
             )
 
-        return function.call(self, arguments)
+        result = function.call(self, arguments)
+        if result is NotImplemented:
+            assert isinstance(function, ZSDClass)
+            raise ZSDRuntimeError(expr.paren, f"Cannot instantiate class {function.name!r}.")
+        
+        return result
     
     def visit_get_expr(self, expr: Get) -> object:
         object = self.evaluate(expr.object)
@@ -322,4 +332,24 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         return tboy.bind(lifesaver)
     
     def visit_range_expr(self, expr: Range) -> object:
-        return range_class.call(self, [expr.start, expr.stop, expr.step])
+        return range_class.call(self, [expr.start, expr.stop])
+    
+    def visit_anonobject_expr(self, expr: AnonObject) -> object:
+        attributes = {
+            name.lexeme: self.evaluate(value)
+            for name, value in expr.attributes.items()
+        }
+
+        methods: dict[str, ZSDFunction] = {}
+        for name, method in expr.methods.items():
+            parameters = [ZSDParam(param.name, param.default and self.evaluate(param.default)) for param in method.params]
+            function = ZSDFunction(method, parameters, self.env, name == "init")
+            methods[name] = function
+
+        instance = ZSDAnonObject(attributes, methods)
+        init = instance.find_method("init")
+        if init:
+            # XXX Maybe some cool gimmick where the init can take arguments?
+            init.bind(instance).call(self, [])
+
+        return instance

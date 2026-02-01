@@ -19,7 +19,7 @@ declare funcAllDefaults(name = "Joshua", count = 1, amplify = 1) {
     var suffix = "!" * amplify;
     var body = "Hello " + name + suffix;
 
-    for (;count > 0; count = count - 1) {
+    for _ of range(count) {
         print body;
     }
 }

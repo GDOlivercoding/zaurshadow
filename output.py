@@ -1,5 +1,5 @@
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 import stmt
 from zsdtoken import Token
 from tokentype import TokenType as tt
@@ -22,6 +22,7 @@ class ReturnException(ZSDRuntimeError):
 
 class ParseError(ValueError): pass
 
+MAX_ARGUMENTS: Final = 255
 stream = sys.stdout
 had_error = False
 had_runtime_error = False

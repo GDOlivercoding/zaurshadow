@@ -1,0 +1,56 @@
+// Concept file
+
+/*
+Unlike class variables, attributes defined outside methods-
+are instance attributes, not class variables
+
+Defining an `init()` method on an anonymous class object
+will call such method as soon as the object is initiated
+and its outsider attributes are defined
+*/
+
+// concept
+class Program {
+    ran => false;
+
+    init(args, cmd) {
+        this.args = args;
+        this.cmd = "py -c " + cmd;
+        this.ran // boolean
+    }
+
+    run() {
+        if !Program.ran {
+            print "program running";
+            Program.ran = true;
+        }
+
+        // [...]
+    }
+    
+}
+
+/*
+Class variables
+
+Class variables are present on the class, accessible on the class.
+Instantiating an instance will copy all class variables onto the instance.
+Mutable objects may mutate the class variable from an instance, but
+assigning to instance attributes inherited from class variables
+will *not* change the class variables
+*/
+
+Program.ran // false
+Program.init // <init(args, cmd) method of class Program>
+
+var runPy = Program();
+
+runPy.ran; // false
+Program.ran // false
+
+runPy.run();
+Program.ran; // true
+runPy.ran; // false
+
+runPy.ran = false; // Program.ran == true
+Program.ran = true; // runPy.ran == false

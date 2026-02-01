@@ -24,6 +24,7 @@ class TokenType(Enum):
     BANG_EQUAL = auto()
     EQUAL = auto()
     EQUAL_EQUAL = auto()
+    EQUAL_GREATER = auto()
     GREATER = auto()
     GREATER_EQUAL = auto()
     LESS = auto()

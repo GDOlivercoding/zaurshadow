@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from itertools import zip_longest
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self, overload
 from environment import Environment
 from output import ReturnException, ZSDRuntimeError
 import stmt
@@ -90,12 +90,12 @@ class ZSDFunction(ZSDCallable):
 
         return f"<{self.name} {decl.name.lexeme}({", ".join(params)})>"
 
-class ZSDNativeFunction(ZSDCallable):
+class ZSDNativeFunction(ZSDFunction):
     def __init__(
         self, 
         arity: tuple[int, int], 
         name: str, 
-        callable: Callable[[Interpreter, list[object]], object],
+        callable: Callable[..., object],
         binding: "ZSDObject | None" = None
     ) -> None:
         self._arity = arity
@@ -111,9 +111,9 @@ class ZSDNativeFunction(ZSDCallable):
     
     def call(self, interpreter: Interpreter, arguments: list[object]) -> object:
         if self.binding:
-            arguments = [self.binding] + arguments
-
-        return self.callable(interpreter, arguments)
+            return self.callable(self.binding, *arguments)
+        return self.callable(*arguments)
     
     def __repr__(self) -> str:
-        return f"<native {self.name}()>"
+        min, max = self.arity()
+        return f"<native {self.name}({min}, {max})>"

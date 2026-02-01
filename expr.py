@@ -1,7 +1,12 @@
 from __future__ import annotations
+from types import MethodType
+from typing import TYPE_CHECKING
 from abc import ABC, abstractmethod
 from typing import Protocol
 from zsdtoken import Token
+
+if TYPE_CHECKING:
+    from stmt import Function
 
 class Visitor[T](Protocol):
     def visit_assign_expr(self, expr: Assign) -> T: ...
@@ -17,11 +22,19 @@ class Visitor[T](Protocol):
     def visit_unary_expr(self, expr: Unary) -> T: ...
     def visit_variable_expr(self, expr: Variable) -> T: ...
     def visit_range_expr(self, expr: Range) -> T: ...
-
+    def visit_anonobject_expr(self, expr: AnonObject) -> T: ...
+ 
 class Expr(ABC): 
     @abstractmethod
     def accept[T](self, visitor: Visitor[T]) -> T: ...
-
+    def __repr__(self) -> str:
+        attributes = "".join([
+            f" {name}={attr!r}"
+            for name in dir(self) 
+            if not name.startswith("_")
+            and not isinstance(attr := getattr(self, name), MethodType)
+        ])
+        return f"<{self.__class__.__name__}{attributes}>"
 
 class Assign(Expr):
     def __init__(self, name: Token, value: Expr):
@@ -30,9 +43,6 @@ class Assign(Expr):
 
     def accept[T](self, visitor: Visitor[T]) -> T:
         return visitor.visit_assign_expr(self)
-
-    def __repr__(self) -> str:
-        return f"<Assign name={self.name} value={self.value}>"
 
 class Binary(Expr):
     def __init__(self, left: Expr, operator: Token, right: Expr):
@@ -43,9 +53,6 @@ class Binary(Expr):
     def accept[T](self, visitor: Visitor[T]) -> T:
         return visitor.visit_binary_expr(self)
 
-    def __repr__(self) -> str:
-        return f"<Binary left={self.left} operator={self.operator} right={self.right}>"
-
 class Call(Expr):
     def __init__(self, callee: Expr, paren: Token, arguments: list[Expr]):
         self.callee = callee
@@ -55,9 +62,6 @@ class Call(Expr):
     def accept[T](self, visitor: Visitor[T]) -> T:
         return visitor.visit_call_expr(self)
 
-    def __repr__(self) -> str:
-        return f"<Call callee={self.callee} paren={self.paren} arguments={self.arguments}>"
-
 class Get(Expr):
     def __init__(self, object: Expr, name: Token):
         self.object = object
@@ -65,9 +69,6 @@ class Get(Expr):
 
     def accept[T](self, visitor: Visitor[T]) -> T:
         return visitor.visit_get_expr(self)
-
-    def __repr__(self) -> str:
-        return f"<Get object={self.object} name={self.name}>"
 
 class Set(Expr):
     def __init__(self, object: Expr, name: Token, value: Expr):
@@ -157,13 +158,20 @@ class Variable(Expr):
         return f"<Variable name={self.name}>"
 
 class Range(Expr):
-    def __init__(self, start: int, stop: int, step: int) -> None:
+    def __init__(self, start: int, stop: int) -> None:
         self.start = start
         self.stop = stop
-        self.step = step
 
     def accept[T](self, visitor: Visitor[T]) -> T:
         return visitor.visit_range_expr(self)
     
     def __repr__(self) -> str:
-        return f"<Range start={self.start} stop={self.stop} step={self.step}>"
+        return f"<Range start={self.start} stop={self.stop}>"
+    
+class AnonObject(Expr):
+    def __init__(self, attributes: dict[Token, Expr], methods: dict[str, Function]) -> None:
+        self.attributes = attributes
+        self.methods = methods
+
+    def accept[T](self, visitor: Visitor[T]) -> T:
+        return visitor.visit_anonobject_expr(self)

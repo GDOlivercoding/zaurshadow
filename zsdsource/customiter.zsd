@@ -1,17 +1,13 @@
-class Repeat {
+class RepeatIterator {
     init(value, count) {
         this.value = value;
         this.count = count;
         this.index = 1;
     }
 
-    iter() {
-        return this;
-    }
-
     next() {
         if this.index > this.count {
-            return nil;
+            return StopIteration;
         }
 
         this.index += 1;
@@ -19,8 +15,37 @@ class Repeat {
     }
 }
 
+class Repeat {
+    init(value, count) {
+        this.value = value;
+        this.count = count;
+    }
+
+    iter() {
+        return RepeatIterator(this.value, this.count);
+    }
+}
+
 var iterable = Repeat("meow", 5);
 
-for iteration of iterable {
-    print iteration;
+// For-of loops accept a value that has a `next()` method
+// or an `iter()` method which returns an object with a `next()` method
+for i of iterable {
+    print i;
+}
+
+iterable.count = 3;
+iterable.value = "mrow";
+
+for i of iterable {
+    print i;
+}
+
+/* 
+if the interpreter doesn't find an `iter()` method
+but finds a `next()` method, it will proceed immediately
+with the object as an iterator
+*/
+for i of RepeatIterator("nya", 4) {
+    print i + "!";
 }

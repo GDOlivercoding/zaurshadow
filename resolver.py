@@ -17,6 +17,7 @@ class ClassType(Enum):
     none = auto()
     klass = auto()
     subclass = auto()
+    anonobject = auto()
 
 class ScopeEntry:
     def __init__(self, token: Token | None = None, ready=False, used=False) -> None:
@@ -172,6 +173,28 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
 
     def visit_range_expr(self, expr: expr.Range) -> None:
         pass
+
+    # TODO
+    # Reference the class visit
+    def visit_anonobject_expr(self, expr: expr.AnonObject) -> None:
+        enclosing_class = self.current_class
+        # Anonymous objects can use `this` in their methods
+        self.current_class = ClassType.anonobject
+        self.new_scope()
+        self.scopes[-1]["this"] = ScopeEntry(None, True, True)
+
+        init = expr.methods.get("init")
+        if init is not None and init.params:
+            output.error(init.name, "init() method of anynomous object may not have parameters.")
+
+        for name, method in expr.methods.items():
+            self.resolve_function(
+                method, 
+                FuncType.initializer if name == "init" else FuncType.method
+            )
+
+        self.pop_scope()
+        self.current_class = enclosing_class
 
     # region utilities
 

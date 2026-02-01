@@ -1,0 +1,24 @@
+class Icecream {
+    init(flavour, cost) {
+        this.flavour = flavour;
+        this.cost = cost;
+    }
+
+    getLabel() {
+        print "You can get " + this.flavour + " icecream just for €" + this.cost + "!";
+    }
+}
+
+var vanilla = Icecream("vanilla", 3.5);
+var choco = Icecream("chocolate", 5);
+
+var lolipop = {
+    cost => 2;
+    flavour => "strawberry";
+    getLabel() {
+        // pyString.capitalize() doesn't exist
+        print this.flavour + " lolipops just for €" + this.cost + "!";
+    }
+};
+
+lolipop.getLabel();

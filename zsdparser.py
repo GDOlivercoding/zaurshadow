@@ -13,10 +13,11 @@ from expr import (
     Super,
     This,
     Unary,
-    Variable
+    Variable,
+    AnonObject,
 )
 from output import ParseError
-from stmt import Param, Stmt
+from stmt import Param, Stmt, Function
 from zsdtoken import Token
 
 import output
@@ -241,7 +242,7 @@ class Parser:
     def return_statement(self):
         keyword = self.previous()
         if self.match(tt.SEMICOLON):
-            value = LiteralValue(None)
+            value = LiteralValue(nil)
         else:
             value = self.expression()
             self.consume(tt.SEMICOLON, "Expect ';' after expression.")
@@ -271,11 +272,11 @@ class Parser:
         return self.assignment()
 
     def assignment(self):
-        expr = self.logical_or()
+        expr = self.anonymous_object()
 
         if self.match(tt.EQUAL, tt.MINUS_EQUAL, tt.PLUS_EQUAL, tt.STAR_EQUAL, tt.SLASH_EQUAL):
             equals = self.previous()
-            value = self.logical_or()
+            value = self.anonymous_object()
 
             if isinstance(expr, Variable):
                 if equals.type == tt.EQUAL:
@@ -291,6 +292,37 @@ class Parser:
             raise self.error(equals, "Invalid assignment target.")
         
         return expr
+    
+    def anonymous_object(self):
+        # Ideally, this should be at the bottom to cater to operators
+        # but, they aren't very necessary for anonymous objects.
+        if self.match(tt.LEFT_BRACE):
+            attributes: dict[Token, Expr] = {}
+            methods: dict[str, Function] = {}
+
+            while not self.check(tt.RIGHT_BRACE) and not self.is_at_end():
+                if self.check(tt.IDENTIFIER):
+                    if self.check_next(tt.EQUAL_GREATER):
+                        name = self.advance()
+                        self.advance()
+                        # XXX dont allow assignment expressions here?
+                        value = self.logical_or()
+                        self.consume(tt.SEMICOLON, "Expect ';' after attribute assignment.")
+                        attributes[name] = value
+
+                    elif self.check_next(tt.LEFT_PAREN):
+                        func = self.function("method")
+                        methods[func.name.lexeme] = func
+                    else:
+                        raise self.error(self.peek(), "Expect '(' or '=>' after identifier.")
+                    
+                else:
+                    raise self.error(self.peek(), "Expect identifier in object body.")
+            
+            self.consume(tt.RIGHT_BRACE, "Expect '}' after object body.")
+            return AnonObject(attributes, methods)
+
+        return self.logical_or()
     
     def logical_or(self):
         expr = self.logical_and()
@@ -409,7 +441,7 @@ class Parser:
             return Super(keyword, method)
         
         if self.match(tt.RANGE):
-            rangeobj = typing.cast("tuple[int, int, int]", self.previous().literal)
+            rangeobj = typing.cast("tuple[int, int]", self.previous().literal)
             return Range(*rangeobj)
         
         #if self.match(tt.DECLARE):
@@ -430,7 +462,7 @@ class Parser:
             while self.match(tt.COMMA):
                 arguments.append(self.expression())
 
-        if len(arguments) > 255:
+        if len(arguments) > output.MAX_ARGUMENTS:
             # This code intentionally reports an error, but it doesn’t throw an error. 
             self.error(self.peek(), "Maximum arity of a function exceeded.")
 
@@ -464,7 +496,7 @@ class Parser:
     #    return stmt.Function(name, parameters, body.statements)
 
     def match(self, *types: tt):
-        """Match if the source follows with any of the tokens given"""
+        """Match if the source follows with any of the tokens given and move forward"""
         for type in types:
             if self.check(type):
                 self.advance()
@@ -479,6 +511,11 @@ class Parser:
     def check(self, type: TokenType):
         if self.is_at_end(): return False
         return self.peek().type == type
+
+    def check_next(self, type: TokenType):
+        token = self.tokens[self.current+1]
+        if token.type == tt.EOF: return False
+        return self.tokens[self.current+1].type == type
 
     def advance(self):
         if not self.is_at_end(): self.current += 1

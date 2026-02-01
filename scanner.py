@@ -55,7 +55,11 @@ class Scanner:
             case "<":
                 add_token(tt.LESS_EQUAL if self.match("=") else tt.LESS)
             case "=":
-                add_token(tt.EQUAL_EQUAL if self.match("=") else tt.EQUAL)
+                add_token(
+                    tt.EQUAL_EQUAL if self.match("=") 
+                    else tt.EQUAL_GREATER if self.match(">") 
+                    else tt.EQUAL
+                )
 
             case "/":
                 if self.match("/"):

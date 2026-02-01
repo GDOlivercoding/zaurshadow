@@ -1,4 +1,4 @@
-class Nil:
+class NilType:
     def __repr__(self) -> str:
         return "nil"
 
@@ -8,9 +8,9 @@ class Nil:
     def __bool__(self) -> bool:
         return False
     
-class TrueClass(int):
+class TrueType(int):
     def __init__(self) -> None:
-        int.__new__(TrueClass, 1) 
+        int.__new__(TrueType, 1) 
 
     def __repr__(self) -> str:
         return "true"
@@ -18,9 +18,9 @@ class TrueClass(int):
     def __bool__(self) -> bool:
         return True
     
-class FalseClass(int):
+class FalseType(int):
     def __init__(self) -> None:
-        int.__new__(FalseClass, 0)
+        int.__new__(FalseType, 0)
 
     def __repr__(self) -> str:
         return "false"
@@ -28,6 +28,11 @@ class FalseClass(int):
     def __bool__(self) -> bool:
         return False
     
-false = FalseClass()
-true = TrueClass()
-nil = Nil()
+class StopIterationType:
+    def __repr__(self) -> str:
+        return "StopIteration"
+
+ZSDStopIteration = StopIterationType()
+false = FalseType()
+true = TrueType()
+nil = NilType()

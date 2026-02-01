@@ -15,4 +15,4 @@ class Token:
         else:
             extra = ""
             
-        return f"<ZSDToken {self.type.name} #L{self.line}{extra}>"
+        return f"<Token {self.type.name} L{self.line}{extra}>"
