@@ -9,8 +9,8 @@ class NilType:
         return False
     
 class TrueType(int):
-    def __init__(self) -> None:
-        int.__new__(TrueType, 1) 
+    def __new__(cls):
+        return int.__new__(cls, 1)
 
     def __repr__(self) -> str:
         return "true"
@@ -19,8 +19,8 @@ class TrueType(int):
         return True
     
 class FalseType(int):
-    def __init__(self) -> None:
-        int.__new__(FalseType, 0)
+    def __new__(cls):
+        return int.__new__(cls, 0)
 
     def __repr__(self) -> str:
         return "false"

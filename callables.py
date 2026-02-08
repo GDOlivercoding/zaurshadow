@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from itertools import zip_longest
-from typing import TYPE_CHECKING, Self, overload
+from typing import TYPE_CHECKING
 from environment import Environment
 from output import ReturnException, ZSDRuntimeError
 import stmt

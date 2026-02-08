@@ -16,3 +16,21 @@ class Token:
             extra = ""
             
         return f"<Token {self.type.name} L{self.line}{extra}>"
+    
+    @classmethod
+    def frm(
+        cls, 
+        token: "Token", 
+        *, 
+        type: TokenType | None = None,
+        lexeme: str | None = None, 
+        literal: object = None, 
+        line: int | None = None
+    ):
+        noneor = lambda left, right: left if left is not None else right
+        return cls(
+            noneor(type, token.type), 
+            noneor(lexeme, token.lexeme), 
+            noneor(literal, token.literal), 
+            noneor(line, token.line)
+        )

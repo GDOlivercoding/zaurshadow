@@ -133,6 +133,11 @@ class Resolver(expr.Visitor[None], stmt.Visitor[None]):
         self.resolve(expr.left)
         self.resolve(expr.right)
 
+    def visit_instanceof_expr(self, expr: expr.InstanceOf) -> None:
+        if expr.left:
+            self.resolve(expr.left)
+        self.resolve(expr.right)
+
     def visit_unary_expr(self, expr: expr.Unary) -> None:
         self.resolve(expr.right)
 

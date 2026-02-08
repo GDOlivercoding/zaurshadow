@@ -1,6 +1,5 @@
 from pathlib import Path
 import sys
-import time
 
 from scanner import Scanner
 from zsdparser import Parser

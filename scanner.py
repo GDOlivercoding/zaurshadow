@@ -142,7 +142,7 @@ class Scanner:
                 end_line = self.current
                 while intable(self.peek()): self.advance()
                 stop = int(self.source[end_line:self.current])
-                return self.add_token(tt.RANGE, (start, stop + inclusive, 1))
+                return self.add_token(tt.RANGE, (start, stop + inclusive))
 
         init_choice = dot and float or int
         #print(f"parse_float(): {self.start=} {self.current=}")

@@ -31,11 +31,11 @@ print "";
     var a = 5;
     print a; // 5
 }
-print a; // 4
+print a; // 6
 print "";
 
 // you can use all of, +-/*, >=, >, ==, <, <= and logical `and` + `or`
-// you can also created groups anywhere
+// you can also use groups anywhere
 print 5 + 4 * 3;
 print (5 + 4) * 3;
 print (5 * 4 == 20) and (64 / 8 == 8);

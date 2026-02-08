@@ -21,6 +21,11 @@ class ReturnException(ZSDRuntimeError):
         super().__init__(self.return_stmt.keyword, self.message)
 
 class ParseError(ValueError): pass
+class ExpectedExpression(ParseError):
+    def __init__(self, token: Token) -> None:
+        self.token = token
+        self.message = "Expected expression."
+        super().__init__(self.message)
 
 MAX_ARGUMENTS: Final = 255
 stream = sys.stdout

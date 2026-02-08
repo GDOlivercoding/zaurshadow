@@ -1,12 +1,17 @@
 from __future__ import annotations
 from types import MethodType
 from typing import TYPE_CHECKING
-from abc import ABC, abstractmethod
 from typing import Protocol
 from zsdtoken import Token
+from dataclasses import dataclass
+from functools import partial
+
 
 if TYPE_CHECKING:
     from stmt import Function
+    norepr_dataclass = dataclass
+else:
+    norepr_dataclass = partial(dataclass, repr=False)
 
 class Visitor[T](Protocol):
     def visit_assign_expr(self, expr: Assign) -> T: ...
@@ -23,10 +28,12 @@ class Visitor[T](Protocol):
     def visit_variable_expr(self, expr: Variable) -> T: ...
     def visit_range_expr(self, expr: Range) -> T: ...
     def visit_anonobject_expr(self, expr: AnonObject) -> T: ...
+    def visit_instanceof_expr(self, expr: InstanceOf) -> T: ...
  
-class Expr(ABC): 
-    @abstractmethod
-    def accept[T](self, visitor: Visitor[T]) -> T: ...
+class Expr: 
+    def accept[T](self, visitor: Visitor[T]) -> T: 
+        return getattr(visitor, f"visit_{type(self).__name__.lower()}_expr")(self)
+    
     def __repr__(self) -> str:
         attributes = "".join([
             f" {name}={attr!r}"
@@ -36,142 +43,79 @@ class Expr(ABC):
         ])
         return f"<{self.__class__.__name__}{attributes}>"
 
+@norepr_dataclass
 class Assign(Expr):
-    def __init__(self, name: Token, value: Expr):
-        self.name = name
-        self.value = value
+    name: Token
+    value: Expr
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_assign_expr(self)
-
+@norepr_dataclass
 class Binary(Expr):
-    def __init__(self, left: Expr, operator: Token, right: Expr):
-        self.left = left
-        self.operator = operator
-        self.right = right
+    left: Expr
+    operator: Token
+    right: Expr
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_binary_expr(self)
-
+@norepr_dataclass
 class Call(Expr):
-    def __init__(self, callee: Expr, paren: Token, arguments: list[Expr]):
-        self.callee = callee
-        self.paren = paren
-        self.arguments = arguments
+    callee: Expr
+    paren: Token
+    arguments: list[Expr]
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_call_expr(self)
-
+@norepr_dataclass
 class Get(Expr):
-    def __init__(self, object: Expr, name: Token):
-        self.object = object
-        self.name = name
+    object: Expr
+    name: Token
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_get_expr(self)
-
+@norepr_dataclass
 class Set(Expr):
-    def __init__(self, object: Expr, name: Token, value: Expr):
-        self.object = object
-        self.name = name
-        self.value = value
+    object: Expr
+    name: Token
+    value: Expr
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_set_expr(self)
-
-    def __repr__(self) -> str:
-        return f"<Set object={self.object} name={self.name} value={self.value}>"
-
+@norepr_dataclass
 class Super(Expr):
-    def __init__(self, keyword: Token, method: Token):
-        self.keyword = keyword
-        self.method = method
+    keyword: Token
+    method: Token
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_super_expr(self)
-
-    def __repr__(self) -> str:
-        return f"<Super keyword={self.keyword} method={self.method}>"
-
+@norepr_dataclass
 class This(Expr):
-    def __init__(self, keyword: Token):
-        self.keyword = keyword
+    keyword: Token
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_this_expr(self)
-
-    def __repr__(self) -> str:
-        return f"<This keyword={self.keyword}>"
-
+@norepr_dataclass
 class Grouping(Expr):
-    def __init__(self, expression: Expr):
-        self.expression = expression
+    expression: Expr
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_grouping_expr(self)
-
-    def __repr__(self) -> str:
-        return f"<Grouping expression={self.expression}>"
-
+@norepr_dataclass
 class Logical(Expr):
-    def __init__(self, left: Expr, operator: Token, right: Expr):
-        self.left = left
-        self.operator = operator
-        self.right = right
-
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_logical_expr(self)
-
-    def __repr__(self) -> str:
-        return f"<Logical left={self.left} operator={self.operator} right={self.right}>"
+    left: Expr
+    operator: Token
+    right: Expr
 
 # 'Literal' collides with typing.Literal
+@norepr_dataclass
 class LiteralValue(Expr):
-    def __init__(self, value: object):
-        self.value = value
+    value: object
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_literalvalue_expr(self)
-
-    def __repr__(self) -> str:
-        return f"<LiteralValue value={self.value}>"
-
+@norepr_dataclass
 class Unary(Expr):
-    def __init__(self, operator: Token, right: Expr):
-        self.operator = operator
-        self.right = right
+    operator: Token
+    right: Expr
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_unary_expr(self)
-
-    def __repr__(self) -> str:
-        return f"<Unary operator={self.operator} right={self.right}>"
-
+@norepr_dataclass
 class Variable(Expr):
-    def __init__(self, name: Token):
-        self.name = name
+    name: Token
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_variable_expr(self)
-
-    def __repr__(self) -> str:
-        return f"<Variable name={self.name}>"
-
+@norepr_dataclass
 class Range(Expr):
-    def __init__(self, start: int, stop: int) -> None:
-        self.start = start
-        self.stop = stop
-
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_range_expr(self)
+    start: int
+    stop: int
     
-    def __repr__(self) -> str:
-        return f"<Range start={self.start} stop={self.stop}>"
-    
+@norepr_dataclass
 class AnonObject(Expr):
-    def __init__(self, attributes: dict[Token, Expr], methods: dict[str, Function]) -> None:
-        self.attributes = attributes
-        self.methods = methods
-
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_anonobject_expr(self)
+    attributes: dict[Token, Expr]
+    methods: dict[str, Function]
+    
+@norepr_dataclass
+class InstanceOf(Expr):
+    left: Expr | None
+    keyword: Token
+    right: Expr

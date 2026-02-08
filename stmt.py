@@ -1,9 +1,16 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
-from typing import Protocol
+from functools import partial
+from types import MethodType
+from typing import TYPE_CHECKING, Protocol
 from expr import Expr, Variable
 from zsdtoken import Token
+
+if TYPE_CHECKING:
+    norepr_dataclass = dataclass
+else:
+    norepr_dataclass = partial(dataclass, repr=False)
 
 class Visitor[T](Protocol):
     def visit_expression_stmt(self, stmt: Expression) -> T: ...
@@ -18,122 +25,70 @@ class Visitor[T](Protocol):
     def visit_for_stmt(self, stmt: For) -> T: ...
 
 class Stmt(ABC): 
-    @abstractmethod
-    def accept[T](self, visitor: Visitor[T]) -> T: ...
-
-
-class Expression(Stmt):
-    def __init__(self, expression: Expr):
-        self.expression = expression
-
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_expression_stmt(self)
-
+    def accept[T](self, visitor: Visitor[T]) -> T: 
+        return getattr(visitor, f"visit_{type(self).__name__.lower()}_stmt")(self)
+    
     def __repr__(self) -> str:
-        return f"<Expression expression={self.expression}>"
+        attributes = "".join([
+            f" {name}={attr!r}"
+            for name in dir(self) 
+            if not name.startswith("_")
+            and not isinstance(attr := getattr(self, name), MethodType)
+        ])
+        return f"<{self.__class__.__name__}{attributes}>"
 
-@dataclass
+@norepr_dataclass
+class Expression(Stmt):
+    expression: Expr
+
+@norepr_dataclass
 class Param:
     name: Token
     default: Expr | None
 
+@norepr_dataclass
 class Function(Stmt):
-    def __init__(self, name: Token, params: list[Param], body: list[Stmt]):
-        self.name = name
-        self.params = params
-        self.body = body
+    name: Token
+    params: list[Param]
+    body: Block
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_function_stmt(self)
-
-    def __repr__(self) -> str:
-        return f"<Function name={self.name} params={self.params} body={self.body}>"
-
+@norepr_dataclass
 class If(Stmt):
-    def __init__(self, conditions: list[tuple[Expr, Stmt]], else_branch: Stmt | None = None):
-        self.conditions = conditions
-        self.else_branch = else_branch
+    conditions: list[tuple[Expr, Stmt]]
+    else_branch: Stmt | None = None
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_if_stmt(self)
-
-    def __repr__(self) -> str:
-        return f"<If conditions={self.conditions} else_branch={self.else_branch}>"
-
+@norepr_dataclass
 class Block(Stmt):
-    def __init__(self, statements: list[Stmt]):
-        self.statements = statements
+    statements: list[Stmt]
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_block_stmt(self)
-
-    def __repr__(self) -> str:
-        return f"<Block statements={self.statements}>"
-
+@norepr_dataclass
 class Class(Stmt):
-    def __init__(self, name: Token, methods: list[Function], superclass: Variable | None = None):
-        self.name = name
-        self.methods = methods
-        self.superclass = superclass
+    name: Token
+    methods: list[Function]
+    superclass: Variable | None = None
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_class_stmt(self)
-
-    def __repr__(self) -> str:
-        return f"<Class name={self.name} methods={self.methods} superclass={self.superclass}>"
-
+@norepr_dataclass
 class Print(Stmt):
-    def __init__(self, expression: Expr):
-        self.expression = expression
+    expression: Expr
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_print_stmt(self)
-
-    def __repr__(self) -> str:
-        return f"<Print expression={self.expression}>"
-
+@norepr_dataclass
 class Return(Stmt):
-    def __init__(self, keyword: Token, value: Expr):
-        self.keyword = keyword
-        self.value = value
+    keyword: Token
+    value: Expr
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_return_stmt(self)
-
-    def __repr__(self) -> str:
-        return f"<Return keyword={self.keyword} value={self.value}>"
-
+@norepr_dataclass
 class Var(Stmt):
-    def __init__(self, name: Token, initializer: Expr):
-        self.name = name
-        self.initializer = initializer
+    name: Token
+    initializer: Expr
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_var_stmt(self)
-
-    def __repr__(self) -> str:
-        return f"<Var name={self.name} initializer={self.initializer}>"
-
+@norepr_dataclass
 class While(Stmt):
-    def __init__(self, condition: Expr, body: Stmt):
-        self.condition = condition
-        self.body = body
+    condition: Expr
+    body: Stmt
 
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_while_stmt(self)
-
-    def __repr__(self) -> str:
-        return f"<While condition={self.condition} body={self.body}>"
-
+@norepr_dataclass
 class For(Stmt):
-    def __init__(self, keyword: Token, initializer: Token, iterable: Expr, body: Stmt) -> None:
-        self.keyword = keyword
-        self.iter_var = initializer
-        self.iterable = iterable
-        self.body = body
-
-    def accept[T](self, visitor: Visitor[T]) -> T:
-        return visitor.visit_for_stmt(self)
-    
-    def __repr__(self) -> str:
-        return f"<For kw={self.keyword} initializer={self.iter_var} iterator={self.iterable} body={self.body}>"
+    keyword: Token
+    iter_var: Token
+    iterable: Expr
+    body: Stmt

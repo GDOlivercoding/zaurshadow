@@ -10,6 +10,7 @@ from expr import (
     Call,
     Get,
     Grouping,
+    InstanceOf,
     LiteralValue,
     Logical,
     Range,
@@ -67,11 +68,11 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
         if isinstance(left, (float | int)) and isinstance(right, (float | int)): return
         raise ZSDRuntimeError(operator, "Operands must be numbers.")
     
-    def execute_block(self, statements: list[stmt.Stmt], env: Environment):
+    def execute_block(self, block: stmt.Block, env: Environment):
         previous = self.env
         try:
             self.env = env
-            for stmt in statements:
+            for stmt in block.statements:
                 self.execute(stmt)
         finally: 
             self.env = previous
@@ -83,11 +84,10 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
     # region visit statements
 
     def visit_block_stmt(self, stmt: stmt.Block) -> None:
-        return self.execute_block(stmt.statements, Environment(self.env))
+        return self.execute_block(stmt, Environment(self.env))
 
     def visit_expression_stmt(self, stmt: stmt.Expression) -> None:
         self.evaluate(stmt.expression)
-        return
     
     def visit_if_stmt(self, stmt: stmt.If) -> None:
         conditions = iter(stmt.conditions)
@@ -353,3 +353,16 @@ class Interpreter(ExprVisitor[object], stmt.Visitor[None]):
             init.bind(instance).call(self, [])
 
         return instance
+    
+    def visit_instanceof_expr(self, expr: InstanceOf) -> object:
+        left = expr.left
+        right = self.evaluate(expr.right)
+
+        if not isinstance(right, ZSDClass):
+            raise ZSDRuntimeError(expr.keyword, "Righthand value is not a class.")
+
+        if left:
+            left = self.evaluate(left)
+            return true if getattr(left, "klass", None) is right else false
+        else: 
+            return getattr(right, "klass", nil)

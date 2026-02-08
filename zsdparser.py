@@ -6,6 +6,7 @@ from expr import (
     Expr,
     Get,
     Grouping,
+    InstanceOf,
     LiteralValue,
     Logical,
     Range,
@@ -16,7 +17,7 @@ from expr import (
     Variable,
     AnonObject,
 )
-from output import ParseError
+from output import ExpectedExpression, ParseError
 from stmt import Param, Stmt, Function
 from zsdtoken import Token
 
@@ -58,16 +59,6 @@ class Parser:
 
         self.consume(tt.SEMICOLON, "Expect ';' after variable declaration.")
         return stmt.Var(name, init)
-
-    def equality(self):
-        expr: Expr = self.comparison()
-
-        while (self.match(tt.BANG_EQUAL, tt.EQUAL_EQUAL)):
-            operator: Token = self.previous()
-            right = self.comparison()
-            expr = Binary(expr, operator, right)
-
-        return expr
 
     # region statements
 
@@ -237,7 +228,7 @@ class Parser:
 
         self.consume(tt.LEFT_BRACE, "Expect '{' after %s declaration" % fn_type)
         body = self.block()
-        return stmt.Function(name, parameters, body.statements)
+        return stmt.Function(name, parameters, body)
     
     def return_statement(self):
         keyword = self.previous()
@@ -271,12 +262,12 @@ class Parser:
     def expression(self) -> Expr:
         return self.assignment()
 
-    def assignment(self):
-        expr = self.anonymous_object()
+    def assignment(self) -> Expr:
+        expr = self.logical_or()
 
         if self.match(tt.EQUAL, tt.MINUS_EQUAL, tt.PLUS_EQUAL, tt.STAR_EQUAL, tt.SLASH_EQUAL):
             equals = self.previous()
-            value = self.anonymous_object()
+            value = self.logical_or()
 
             if isinstance(expr, Variable):
                 if equals.type == tt.EQUAL:
@@ -292,39 +283,8 @@ class Parser:
             raise self.error(equals, "Invalid assignment target.")
         
         return expr
-    
-    def anonymous_object(self):
-        # Ideally, this should be at the bottom to cater to operators
-        # but, they aren't very necessary for anonymous objects.
-        if self.match(tt.LEFT_BRACE):
-            attributes: dict[Token, Expr] = {}
-            methods: dict[str, Function] = {}
-
-            while not self.check(tt.RIGHT_BRACE) and not self.is_at_end():
-                if self.check(tt.IDENTIFIER):
-                    if self.check_next(tt.EQUAL_GREATER):
-                        name = self.advance()
-                        self.advance()
-                        # XXX dont allow assignment expressions here?
-                        value = self.logical_or()
-                        self.consume(tt.SEMICOLON, "Expect ';' after attribute assignment.")
-                        attributes[name] = value
-
-                    elif self.check_next(tt.LEFT_PAREN):
-                        func = self.function("method")
-                        methods[func.name.lexeme] = func
-                    else:
-                        raise self.error(self.peek(), "Expect '(' or '=>' after identifier.")
-                    
-                else:
-                    raise self.error(self.peek(), "Expect identifier in object body.")
-            
-            self.consume(tt.RIGHT_BRACE, "Expect '}' after object body.")
-            return AnonObject(attributes, methods)
-
-        return self.logical_or()
-    
-    def logical_or(self):
+   
+    def logical_or(self) -> Expr:
         expr = self.logical_and()
 
         while self.match(tt.OR):
@@ -334,7 +294,7 @@ class Parser:
 
         return expr
     
-    def logical_and(self):
+    def logical_and(self) -> Expr:
         expr = self.equality()
 
         while self.match(tt.AND):
@@ -343,18 +303,50 @@ class Parser:
             expr = Logical(expr, operator, right)
 
         return expr
+    
+    def equality(self):
+        expr: Expr = self.comparison()
 
-    def comparison(self):
-        expr = self.term()
+        while self.match(tt.BANG_EQUAL, tt.EQUAL_EQUAL):
+            operator: Token = self.previous()
+            right = self.comparison()
+            expr = Binary(expr, operator, right)
+
+        return expr
+
+    def comparison(self) -> Expr:
+        expr = self.instanceof()
 
         while self.match(tt.GREATER, tt.GREATER_EQUAL, tt.LESS, tt.LESS_EQUAL):
             operator = self.previous()
-            right = self.term()
+            right = self.instanceof()
             expr = Binary(expr, operator, right)
 
         return expr
     
-    def term(self):
+    def instanceof(self) -> Expr:
+        exc = None
+        try:
+            # expr instanceof klass
+            expr = self.term()
+        except ExpectedExpression as e:
+            # instanceof expr
+            exc = e
+            expr = None
+
+        if self.match(tt.INSTANCEOF):
+            operator = self.previous()
+            right = self.term()
+            return InstanceOf(expr, operator, right)
+        
+        if exc is not None:
+            output.error(exc.token, exc.message)
+            raise exc
+        
+        assert expr is not None
+        return expr
+    
+    def term(self) -> Expr:
         expr = self.factor()
 
         while self.match(tt.MINUS, tt.PLUS):
@@ -364,7 +356,7 @@ class Parser:
 
         return expr
     
-    def factor(self):
+    def factor(self) -> Expr:
         expr = self.unary()
 
         while self.match(tt.SLASH, tt.STAR, tt.LEFT_PAREN):
@@ -382,18 +374,14 @@ class Parser:
 
                 expr = Binary(
                     expr, 
-                    Token(
-                        tt.STAR, 
-                        operator.lexeme,
-                        operator.literal,
-                        operator.line,
-                    ), 
+                    Token.frm(operator, type=tt.STAR),
                     right
                 )
 
         return expr
+
     
-    def unary(self):
+    def unary(self) -> Expr:
         if self.match(tt.PLUS, tt.MINUS, tt.BANG):
             operator = self.previous()
             right = self.unary()
@@ -401,7 +389,7 @@ class Parser:
         
         return self.call()
     
-    def call(self):
+    def call(self) -> Expr:
         expr = self.primary()
 
         while True:
@@ -444,13 +432,16 @@ class Parser:
             rangeobj = typing.cast("tuple[int, int]", self.previous().literal)
             return Range(*rangeobj)
         
+        if self.match(tt.LEFT_BRACE):
+            return self.anonymous_object()
+        
         #if self.match(tt.DECLARE):
         #    return self.expression_function()
 
         if self.match(tt.IDENTIFIER):
             return Variable(self.previous())
         
-        raise self.error(self.peek(), "Expected expression.")
+        raise ExpectedExpression(self.peek())
 
     # region parser tools
 
@@ -469,6 +460,33 @@ class Parser:
         # We will use this paren token to report errors later
         paren = self.consume(tt.RIGHT_PAREN, "Expect ')' after arguments.")
         return Call(callee, paren, arguments)
+    
+     
+    def anonymous_object(self):
+        attributes: dict[Token, Expr] = {}
+        methods: dict[str, Function] = {}
+
+        while not self.check(tt.RIGHT_BRACE) and not self.is_at_end():
+            if self.check(tt.IDENTIFIER):
+                if self.check_next(tt.EQUAL_GREATER):
+                    name = self.advance()
+                    self.advance()
+                    # XXX dont allow assignment expressions here?
+                    value = self.logical_or()
+                    self.consume(tt.SEMICOLON, "Expect ';' after attribute assignment.")
+                    attributes[name] = value
+
+                elif self.check_next(tt.LEFT_PAREN):
+                    func = self.function("method")
+                    methods[func.name.lexeme] = func
+                else:
+                    raise self.error(self.peek(), "Expect '(' or '=>' after identifier.")
+                
+            else:
+                raise self.error(self.peek(), "Expect identifier in object body.")
+        
+        self.consume(tt.RIGHT_BRACE, "Expect '}' after object body.")
+        return AnonObject(attributes, methods)
     
     #def expression_function(self):
     #    if self.match(tt.IDENTIFIER):

@@ -39,6 +39,7 @@ class TokenType(Enum):
     VAR = auto()
     AND = auto()
     OR = auto()
+    INSTANCEOF = auto()
 
     IF = auto()
     ELSEIF = auto()
@@ -81,5 +82,6 @@ keywords: dict[str, TokenType] = {
     "var": TokenType.VAR,
     "while": TokenType.WHILE,
     "do": TokenType.DO,
-    "of": TokenType.OF
+    "of": TokenType.OF,
+    "instanceof": TokenType.INSTANCEOF
 }
